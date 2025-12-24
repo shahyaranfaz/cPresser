@@ -1,25 +1,37 @@
+#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define SEARCH_BUFFER 64000
 #define LOOKAHEAD_BUFFER 256
-#define READ_SIZE 128000000
+#define CHUNK_SIZE 128000000
 
 //FILE INPUT
-unsigned char *read_file(const char *filename, size_t *out_size) {
+unsigned char *read_file(const char *filename, size_t *read_size) {
     FILE *fp = fopen(filename, "rb");
     if (!fp) {
         perror("Error opening file");
         return NULL;
     }
 
-    fseek(fp, 0, SEEK_END);
+    if (fseek(fp, 0, SEEK_END) != 0) {
+        fclose(fp);
+        return NULL;
+    }
+
     const long size = ftell(fp);
+    if (size < 0) {
+        fclose(fp);
+        return NULL;
+    }
+
     fseek(fp, 0, SEEK_SET);
 
-    if (size <= 0) {
+    if (size == 0) {
         fclose(fp);
+        *read_size = 0;
         return NULL;
     }
 
@@ -33,12 +45,20 @@ unsigned char *read_file(const char *filename, size_t *out_size) {
     size_t total_read = 0;
 
     while (total_read < (size_t) size) {
-        size_t to_read = size - total_read;
-        if (to_read > READ_SIZE)
-            to_read = READ_SIZE;
+        size_t to_read = (size_t)size - total_read;
+        if (to_read > CHUNK_SIZE)
+            to_read = CHUNK_SIZE;
 
-        size_t bytes = fread(buffer + total_read, 1, to_read, fp);
-        if (bytes == 0) break;
+        const size_t bytes = fread(buffer + total_read, 1, to_read, fp);
+
+        if (bytes == 0) {
+            if (ferror(fp)) {
+                free(buffer);
+                fclose(fp);
+                return NULL;
+            }
+            break;
+        }
 
         total_read += bytes;
     }
@@ -50,16 +70,45 @@ unsigned char *read_file(const char *filename, size_t *out_size) {
         return NULL;
     }
 
-    *out_size = total_read;
+    *read_size = total_read;
     return buffer;
 }
 
-//COMPRESSION
-typedef struct {
-    uint16_t distance;
-    uint8_t length;
-} Match;
+void write_file(const char *filename, unsigned char* buffer, size_t *write_size) {
+    if (!buffer || !write_size || *write_size == 0) return;
 
+    FILE *fp = fopen(filename, "wb");
+    if (!fp) {
+        perror("Error opening file");
+        return;
+    }
+
+    size_t total_written = 0;
+
+    while (total_written < *write_size) {
+        size_t to_write = *write_size - total_written;
+        if (to_write > CHUNK_SIZE)
+            to_write = CHUNK_SIZE;
+
+        const size_t bytes = fwrite(buffer + total_written, 1, to_write, fp);
+        if (bytes == 0) {
+            if (ferror(fp)) {
+                perror("Error writing file");
+            }
+            break;
+        }
+
+        total_written += bytes;
+    }
+    if (total_written != *write_size) {
+        fprintf(stderr, "Warning: wrote %zu of %zu bytes\n", total_written, *write_size);
+    }
+
+    fclose(fp);
+    *write_size = total_written;
+}
+
+//COMPRESSION
 #define HASH_BITS   16
 #define HASH_SIZE   (1 << HASH_BITS)
 #define HASH_MASK   (HASH_SIZE - 1)
@@ -109,6 +158,11 @@ int prev[SEARCH_BUFFER];
         } \
     } while(0)
 
+typedef struct {
+    uint16_t distance;
+    uint8_t length;
+} Match;
+
 Match find_longest_match(const unsigned char *buffer, const size_t pos, const size_t buffer_size) {
     Match match = {0,0};
     if (pos + MIN_MATCH > buffer_size) return match;
@@ -150,7 +204,6 @@ unsigned char *compress(const unsigned char *in_buffer, const size_t in_size, si
     *out_size = j;
     return out_buffer;
 }
-//HUFFMAN
 
 //DECOMPRESSION
 unsigned char* decompress(const unsigned char *in_buffer, const size_t in_size, size_t *out_size) {
@@ -186,12 +239,63 @@ unsigned char* decompress(const unsigned char *in_buffer, const size_t in_size, 
 }
 
 int main(void) {
-    printf("Compress (c) or Decompress (d): ");
-    char mode;
-    scanf("%c", &mode);
+    while (1) {
+        printf("\nCompress (c), Decompress (d), or Exit (x): ");
+        char mode;
+        scanf(" %c", &mode);
+        mode = (char)toupper((unsigned char)mode);
 
-    printf("Enter filename: ");
-    char input_filename[256];
-    scanf("%s", input_filename);
+        if (mode == 'X') break;
+
+        if (mode != 'C' && mode != 'D') {
+            printf("Invalid input. Please try again.\n");
+            continue;
+        }
+
+        printf("Enter filename: ");
+        char input_filename[256];
+        if (scanf("%255s", input_filename) != 1) {
+            printf("Error reading filename.\n");
+            continue;
+        }
+
+        size_t read_size;
+        unsigned char* buffer = read_file(input_filename, &read_size);
+        if (!buffer) {
+            printf("Error: Could not read file '%s'\n", input_filename);
+            continue;
+        }
+
+        size_t write_size;
+        unsigned char* out_buffer;
+        char output_filename[300];
+
+        if (mode == 'C') {
+            out_buffer = compress(buffer, read_size, &write_size);
+            snprintf(output_filename, sizeof(output_filename), "%s.cmp", input_filename);
+        } else {
+            out_buffer = decompress(buffer, read_size, &write_size);
+            const size_t len = strlen(input_filename);
+            if (len > 4 && strcmp(input_filename + len - 4, ".cmp") == 0) {
+                strncpy(output_filename, input_filename, len - 4);
+                output_filename[len - 4] = '\0';
+            } else {
+                snprintf(output_filename, sizeof(output_filename), "%s.out", input_filename);
+            }
+        }
+
+        if (!out_buffer) {
+            printf("Error: %s failed\n", mode == 'C' ? "Compression" : "Decompression");
+            free(buffer);
+            continue;
+        }
+
+        write_file(output_filename, out_buffer, &write_size);
+        printf("Success! Output written to '%s' (%zu bytes)\n", output_filename, write_size);
+
+        free(out_buffer);
+        free(buffer);
+    }
+
+    return 0;
 }
-
