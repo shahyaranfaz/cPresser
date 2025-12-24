@@ -14,9 +14,8 @@ unsigned char *read_file(const char *filename, size_t *out_size) {
         return NULL;
     }
 
-    // Get file size
     fseek(fp, 0, SEEK_END);
-    long size = ftell(fp);
+    const long size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
     if (size <= 0) {
@@ -59,38 +58,65 @@ unsigned char *read_file(const char *filename, size_t *out_size) {
 typedef struct {
     uint16_t distance;
     uint8_t length;
-    unsigned char symbol;
-} Token;
-
-typedef struct {
-    int distance;
-    int length;
 } Match;
 
 Match find_longest_match(unsigned char *buffer, size_t pos, size_t buf_size);
 
-unsigned char *tokenize(unsigned char *in_buffer, const size_t in_size, size_t *out_size) {
+size_t tokenize(unsigned char* buffer, Match match, unsigned char symbol) {
+    size_t i = 0;
+    buffer[i++] = match.distance >> 8;
+    buffer[i++] = match.distance & 0xFF;
+    buffer[i++] = match.length;
+    buffer[i++] = symbol;
+    return i;
+}
+
+unsigned char *compress(unsigned char *in_buffer, const size_t in_size, size_t *out_size) {
     unsigned char *out_buffer = malloc(in_size * 4);
     if (!out_buffer) return NULL;
     size_t i = 0, j = 0;
     while (i < in_size) {
         const Match match = find_longest_match(in_buffer, i, in_size);
         const unsigned char next_symbol = (i + match.length < in_size) ? in_buffer[i + match.length] : 0;
-        const Token t = {.distance = match.distance, .length = match.length, .symbol = next_symbol};
-        out_buffer[j++] = t.distance >> 8;
-        out_buffer[j++] = t.distance & 0xFF;
-        out_buffer[j++] = t.length;
-        out_buffer[j++] = t.symbol;
+        j += tokenize(&out_buffer[j], match, next_symbol);
         i += match.length + 1;
     }
     *out_size = j;
     return out_buffer;
 }
-
 //HUFFMAN
 
 //DECOMPRESSION
-void detokenize();
+unsigned char* decompress(const unsigned char *in_buffer, const size_t in_size, size_t *out_size) {
+    unsigned char *out_buffer = malloc(in_size);
+    if (!out_buffer) return NULL;
+    size_t i = 0, j = 0;
+    while (i + 3 < in_size) {
+        const uint16_t distance = (in_buffer[i] << 8) | in_buffer[i + 1];
+        const uint8_t length = in_buffer[i+2];
+        const unsigned char symbol = in_buffer[i + 3];
+        i += 4;
+
+        unsigned char* tmp = realloc(out_buffer,j + length + 1);
+        if (!tmp) {
+            free(out_buffer);
+            return NULL;
+        }
+        out_buffer = tmp;
+
+        for (size_t k = 0; k < length; k++) {
+            if (distance > j) {
+                free(out_buffer);
+                return NULL;
+            }
+            out_buffer[j] = out_buffer[j-distance];
+            j++;
+        }
+        out_buffer[j++] = symbol;
+    }
+    *out_size = j;
+    return out_buffer;
+}
 
 // --- MAIN ---
 int main(void) {
