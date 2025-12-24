@@ -1,0 +1,26 @@
+# JetBrains IDE
+.idea/
+*.iml
+
+# Build folders (CMake)
+cmake-build-*/
+build-*/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+
+# User-specific files
+*.user
+*.user.*
+*.suo
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*~
+*.bak
+*.tmp
