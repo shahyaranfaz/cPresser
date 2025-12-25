@@ -15,6 +15,7 @@ cmake_install.cmake
 *.user.*
 *.suo
 *.swp
+*.exe
 
 # OS generated files
 .DS_Store
