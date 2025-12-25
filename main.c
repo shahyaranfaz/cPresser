@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_FILE_SIZE 1000000000
 
@@ -46,6 +47,8 @@ int main(void) {
         unsigned char* out_buffer;
         char output_filename[300];
 
+        clock_t start_time = clock();
+
         if (mode == 'C') {
             out_buffer = compress(buffer, read_size, &write_size);
             snprintf(output_filename, sizeof(output_filename), "%s.cmp", input_filename);
@@ -67,7 +70,9 @@ int main(void) {
         }
 
         write_file(output_filename, out_buffer, &write_size);
-        printf("Success! Output written to '%s' (%zu bytes)\n", output_filename, write_size);
+
+        clock_t end_time = clock();
+        printf("Success! Output written to '%s' (%zu bytes, %.3f seconds)\n", output_filename, write_size, (double)(end_time - start_time) / CLOCKS_PER_SEC);
 
         free(out_buffer);
         free(buffer);

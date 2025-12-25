@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define CHUNK_SIZE 128000000
+#define CHUNK_SIZE 4000000
 
 unsigned char *read_file(const char *filename, size_t *read_size) {
     FILE *fp = fopen(filename, "rb");
