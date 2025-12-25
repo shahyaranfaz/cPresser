@@ -4,9 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SEARCH_BUFFER 64000
+#define SEARCH_BUFFER 65536
 #define LOOKAHEAD_BUFFER 256
 #define CHUNK_SIZE 128000000
+#define MAX_FILE_SIZE 1000000000
 
 //FILE INPUT
 unsigned char *read_file(const char *filename, size_t *read_size) {
@@ -119,8 +120,14 @@ void write_file(const char *filename, unsigned char* buffer, size_t *write_size)
 int head[HASH_SIZE];
 int prev[SEARCH_BUFFER];
 
+#define INIT_HASH() \
+    do { \
+        memset(head, -1, sizeof(head)); \
+        memset(prev, -1, sizeof(prev)); \
+    } while(0)
+
 //same one as deflate
-#define UPDATE_HASH(h, c) (h = (((h) << HASH_SHIFT) ^ (c)) & HASH_MASK)
+#define UPDATE_HASH(hash, curr) (hash = (((hash) << HASH_SHIFT) ^ (curr)) & HASH_MASK)
 
 #define INSERT_HASH(hash, pos) \
     do { \
@@ -140,11 +147,6 @@ int prev[SEARCH_BUFFER];
                 if (buffer[pos] == buffer[chain_pos] && \
                     buffer[pos + best_len] == buffer[chain_pos + best_len]) { \
                     int len = 0; \
-                    while (len + 4 <= max_len) { \
-                        if (*(uint32_t*)(buffer + pos + len) != *(uint32_t*)(buffer + chain_pos + len)) \
-                            break; \
-                        len += 4; \
-                    } \
                     while (len < max_len && buffer[pos + len] == buffer[chain_pos + len]) \
                         len++; \
                     \
@@ -167,13 +169,16 @@ Match find_longest_match(const unsigned char *buffer, const size_t pos, const si
     Match match = {0,0};
     if (pos + MIN_MATCH > buffer_size) return match;
 
-    int hash = buffer[pos] & HASH_MASK;
-    for (int k = 1; k < MIN_MATCH; k++)
+   int hash = 0;
+    for (int k = 0; k < MIN_MATCH; k++)
         UPDATE_HASH(hash, buffer[pos+k]);
 
     int best_len = 0;
     int best_pos = 0;
     MATCH_HASH(hash, pos, buffer, buffer_size - pos, best_len, best_pos);
+    INSERT_HASH(hash, pos);
+
+    if (best_len > 255) best_len = 255;
 
     if (best_len >= MIN_MATCH) {
         match.distance = (uint16_t)(pos - best_pos);
@@ -192,13 +197,33 @@ size_t tokenize(unsigned char* buffer, const Match match, const unsigned char sy
 }
 
 unsigned char *compress(const unsigned char *in_buffer, const size_t in_size, size_t *out_size) {
+    INIT_HASH();
     unsigned char *out_buffer = malloc(in_size * 4);
     if (!out_buffer) return NULL;
     size_t i = 0, j = 0;
     while (i < in_size) {
+        if (i + MIN_MATCH > in_size) {
+            out_buffer[j++] = 0;
+            out_buffer[j++] = 0;
+            out_buffer[j++] = 0;
+            out_buffer[j++] = in_buffer[i++];
+            continue;
+        }
+
         const Match match = find_longest_match(in_buffer, i, in_size);
         const unsigned char next_symbol = (i + match.length < in_size) ? in_buffer[i + match.length] : 0;
         j += tokenize(&out_buffer[j], match, next_symbol);
+
+        for (size_t k = 1; k <= match.length; k++) {
+            if (i + k + MIN_MATCH > in_size)
+                break;
+
+            int h = 0;
+            for (int t = 0; t < MIN_MATCH; t++)
+                UPDATE_HASH(h, in_buffer[i + k + t]);
+
+            INSERT_HASH(h, i + k);
+        }
         i += match.length + 1;
     }
     *out_size = j;
@@ -207,7 +232,8 @@ unsigned char *compress(const unsigned char *in_buffer, const size_t in_size, si
 
 //DECOMPRESSION
 unsigned char* decompress(const unsigned char *in_buffer, const size_t in_size, size_t *out_size) {
-    unsigned char *out_buffer = malloc(in_size);
+    size_t capacity = in_size * 4;
+    unsigned char *out_buffer = malloc(capacity);
     if (!out_buffer) return NULL;
     size_t i = 0, j = 0;
     while (i + 3 < in_size) {
@@ -216,17 +242,17 @@ unsigned char* decompress(const unsigned char *in_buffer, const size_t in_size, 
         const unsigned char symbol = in_buffer[i + 3];
         i += 4;
 
-        if (distance > j) {
+        if (distance > j || (distance == 0 && length != 0)) {
             free(out_buffer);
             return NULL;
         }
 
-        unsigned char* tmp = realloc(out_buffer,j + length + 1);
-        if (!tmp) {
-            free(out_buffer);
-            return NULL;
+        if (j + length + 1 > capacity && capacity * 2 < INT32_MAX) {
+            capacity *= 2;
+            unsigned char *tmp = realloc(out_buffer, capacity);
+            if (!tmp) { free(out_buffer); return NULL; }
+            out_buffer = tmp;
         }
-        out_buffer = tmp;
 
         for (size_t k = 0; k < length; k++) {
             out_buffer[j] = out_buffer[j-distance];
@@ -263,6 +289,11 @@ int main(void) {
         unsigned char* buffer = read_file(input_filename, &read_size);
         if (!buffer) {
             printf("Error: Could not read file '%s'\n", input_filename);
+            continue;
+        }
+
+        if (read_size > MAX_FILE_SIZE) {
+            printf("Error: File size too large.\n");
             continue;
         }
 
