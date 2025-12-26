@@ -11,8 +11,8 @@
 #define HASH_MASK   (HASH_SIZE - 1)
 #define HASH_SHIFT  5
 #define MIN_MATCH   4
-#define MAX_MATCH   258
-#define MAX_CHAIN   128
+#define MAX_MATCH   255
+#define MAX_CHAIN   32
 
 static int64_t head[HASH_SIZE];
 static int64_t prev[SEARCH_BUFFER];
@@ -62,26 +62,19 @@ typedef struct {
     unsigned int length: 8;
 } Match;
 
-static Match find_longest_match(const unsigned char *buffer, const uint64_t pos, const uint64_t buffer_size) {
+static Match find_longest_match(const unsigned char *buffer, const uint64_t pos, const uint64_t buffer_size, int hash) {
     Match match = {.flag = 0};
     if (pos + MIN_MATCH > buffer_size) return match;
-
-    int hash = 0;
-    for (int k = 0; k < MIN_MATCH; k++)
-        UPDATE_HASH(hash, buffer[pos+k]);
-
     int best_len = 0;
     int64_t best_pos = -1;
 
     MATCH_HASH(hash, pos, buffer, buffer_size - pos, &best_len, &best_pos, buffer_size);
     INSERT_HASH(hash, pos);
 
-    if (best_len > 255) best_len = 255;
-
     if (best_len >= MIN_MATCH && best_pos >= 0 && best_pos < (int64_t)pos && pos - best_pos < 0x7FFF) {
         match.flag = 1;
         match.distance = pos - best_pos;
-        match.length = (uint8_t)best_len;
+        match.length = (best_len > 255) ? 255 : (uint8_t)best_len;
     }
     return match;
 }
@@ -114,6 +107,11 @@ unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, 
     if (!out_buffer) return NULL;
     memcpy(out_buffer, &in_size, 8);
     uint64_t read_index = 0, write_index = 64;
+
+    int hash = 0;
+    for (int i = 0; i < MIN_MATCH - 1 && i < in_size; i++)
+        UPDATE_HASH(hash, in_buffer[i]);
+
     while (read_index < in_size) {
         if (read_index + MIN_MATCH > in_size) {
             WRITE_BITS(out_buffer, &write_index, 0, 1);
@@ -121,23 +119,24 @@ unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, 
             read_index++;
             continue;
         }
-
-        const Match match = find_longest_match(in_buffer, read_index, in_size);
+        UPDATE_HASH(hash, in_buffer[read_index + MIN_MATCH - 1]);
+        const Match match = find_longest_match(in_buffer, read_index, in_size, hash);
         WRITE_BITS(out_buffer, &write_index, match.flag, 1);
         if (match.flag == 0) {
             WRITE_BITS(out_buffer, &write_index, in_buffer[read_index], 8);
-            read_index += 1;
+            read_index++;
         } else {
             WRITE_BITS(out_buffer, &write_index, match.distance, 15);
             WRITE_BITS(out_buffer, &write_index, match.length, 8);
 
-            for (uint64_t k = 1; k < match.length && read_index + k + MIN_MATCH <= in_size; k++) {
-                int h = 0;
-                for (int t = 0; t < MIN_MATCH; t++)
-                    UPDATE_HASH(h, in_buffer[read_index + k + t]);
-                INSERT_HASH(h, read_index + k);
+            for (uint32_t k = 1; k < match.length; k++) {
+                read_index++;
+                if (read_index + MIN_MATCH - 1 < in_size) {
+                    UPDATE_HASH(hash, in_buffer[read_index + MIN_MATCH - 1]);
+                    INSERT_HASH(hash, read_index);
+                }
             }
-            read_index += match.length;
+            read_index++;
         }
     }
     *out_size = (write_index + 7) / 8;
