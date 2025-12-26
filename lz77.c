@@ -14,8 +14,8 @@
 #define MAX_MATCH   258
 #define MAX_CHAIN   128
 
-static int head[HASH_SIZE];
-static int prev[SEARCH_BUFFER];
+static int64_t head[HASH_SIZE];
+static int64_t prev[SEARCH_BUFFER];
 
 #define INIT_HASH() \
     do { \
@@ -28,18 +28,17 @@ static int prev[SEARCH_BUFFER];
 
 #define INSERT_HASH(hash, pos) \
     do { \
-        int buf_index = (pos) & (SEARCH_BUFFER - 1); \
-        prev[buf_index] = head[hash]; \
-        head[hash] = (int)pos; \
+        prev[(pos) & (SEARCH_BUFFER - 1)] = head[hash]; \
+        head[hash] = pos; \
     } while(0)
 
 #define MATCH_HASH(hash, pos, buffer, lookahead, best_len, best_pos, buf_size) \
 do { \
-    int chain_pos = head[hash]; \
+    int64_t chain_pos = head[hash]; \
     int chain_count = 0; \
     int max_len = (lookahead < MAX_MATCH) ? lookahead : MAX_MATCH; \
     while (chain_pos >= 0 && chain_count++ < MAX_CHAIN) { \
-        int offset = (int)(pos - chain_pos); \
+        int64_t offset = pos - chain_pos; \
         if (offset <= 0 || offset > SEARCH_BUFFER) { \
             chain_pos = prev[chain_pos & (SEARCH_BUFFER - 1)]; \
             continue; \
@@ -47,7 +46,7 @@ do { \
         int safe_len = 0; \
         while (safe_len < max_len && pos + safe_len < buf_size && chain_pos + safe_len < buf_size && buffer[pos + safe_len] == buffer[chain_pos + safe_len]) \
             safe_len++; \
-        if (safe_len >= MIN_MATCH && safe_len > *best_len) { \
+        if (safe_len >= MIN_MATCH && safe_len > *best_len && chain_pos < pos) { \
             *best_len = safe_len; \
             *best_pos = chain_pos; \
         } \
@@ -56,6 +55,7 @@ do { \
     } \
 } while(0)
 
+
 typedef struct {
     unsigned int flag: 1;
     unsigned int distance: 15;
@@ -63,7 +63,7 @@ typedef struct {
 } Match;
 
 static Match find_longest_match(const unsigned char *buffer, const uint64_t pos, const uint64_t buffer_size) {
-    Match match = {0};
+    Match match = {.flag = 0};
     if (pos + MIN_MATCH > buffer_size) return match;
 
     int hash = 0;
@@ -71,17 +71,17 @@ static Match find_longest_match(const unsigned char *buffer, const uint64_t pos,
         UPDATE_HASH(hash, buffer[pos+k]);
 
     int best_len = 0;
-    int best_pos = 0;
+    int64_t best_pos = -1;
+
     MATCH_HASH(hash, pos, buffer, buffer_size - pos, &best_len, &best_pos, buffer_size);
     INSERT_HASH(hash, pos);
 
     if (best_len > 255) best_len = 255;
 
-    if (best_len >= MIN_MATCH) {
+    if (best_len >= MIN_MATCH && best_pos >= 0 && best_pos < (int64_t)pos && pos - best_pos < 0x7FFF) {
         match.flag = 1;
         match.distance = pos - best_pos;
-        if (match.distance > 0x7FFF) match.distance = 0x7FFF;
-        match.length = (uint8_t) (best_len);
+        match.length = (uint8_t)best_len;
     }
     return match;
 }
@@ -110,9 +110,8 @@ do { \
 
 unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, uint64_t *out_size) {
     INIT_HASH();
-    unsigned char *out_buffer = malloc(in_size * 4 + 8);
+    unsigned char *out_buffer = malloc(in_size * 3 + 8);
     if (!out_buffer) return NULL;
-    memset(out_buffer, 0, in_size * 4 + 8);
     memcpy(out_buffer, &in_size, 8);
     uint64_t read_index = 0, write_index = 64;
     while (read_index < in_size) {
@@ -132,7 +131,7 @@ unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, 
             WRITE_BITS(out_buffer, &write_index, match.distance, 15);
             WRITE_BITS(out_buffer, &write_index, match.length, 8);
 
-            for (uint64_t k = 1; k < match.length && (read_index + k + MIN_MATCH) <= in_size; k++) {
+            for (uint64_t k = 1; k < match.length && read_index + k + MIN_MATCH <= in_size; k++) {
                 int h = 0;
                 for (int t = 0; t < MIN_MATCH; t++)
                     UPDATE_HASH(h, in_buffer[read_index + k + t]);
@@ -141,8 +140,6 @@ unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, 
             read_index += match.length;
         }
     }
-    if (write_index % 8 != 0)
-        WRITE_BITS(out_buffer, &write_index, 0, 8 - (write_index % 8));
     *out_size = (write_index + 7) / 8;
     return out_buffer;
 }
@@ -152,7 +149,6 @@ unsigned char *decompress(const unsigned char *in_buffer, const uint64_t in_size
     memcpy(&original_size, in_buffer, 8);
     unsigned char *out_buffer = malloc(original_size);
     if (!out_buffer) return NULL;
-    memset(out_buffer, 0, original_size);
     uint64_t read_index = 64, write_index = 0;
     unsigned char flag, symbol;
     uint16_t distance;
@@ -161,14 +157,12 @@ unsigned char *decompress(const unsigned char *in_buffer, const uint64_t in_size
     while (write_index < original_size) {
         READ_BITS(in_buffer, &read_index, 1, flag);
         if (flag == 0) {
-            if ((read_index + 8) > in_size * 8) break;
             READ_BITS(in_buffer, &read_index, 8, symbol);
             out_buffer[write_index++] = symbol;
         } else {
-            if ((read_index + 23) > in_size * 8) break;
             READ_BITS(in_buffer, &read_index, 15, distance);
             READ_BITS(in_buffer, &read_index, 8, length);
-            if (distance == 0 || distance > write_index || write_index + length > original_size) {
+            if (distance == 0 || distance > write_index) {
                 free(out_buffer);
                 return NULL;
             }
