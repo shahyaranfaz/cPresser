@@ -22,13 +22,8 @@ typedef struct {
 } BitBuffer;
 
 static int32_t head[HASH_SIZE];
-static int32_t prev[SEARCH_BUFFER];
 
-#define INIT_HASH() \
-    do { \
-        memset(head, -1, sizeof(head)); \
-        memset(prev, -1, sizeof(prev)); \
-    } while(0)
+#define INIT_HASH() (memset(head, -1, sizeof(head)))
 
 #define UPDATE_HASH(hash, buffer, pos) do { \
     uint32_t _val = *(uint32_t*)(buffer + pos); \
@@ -107,9 +102,9 @@ unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, 
     int match = 0;
 
     while (read_index < in_size) {
-        int hash = 0;
         uint32_t curr_len = 0, curr_pos = -1;
         if (read_index + 4 <= in_size) {
+            int hash = 0;
             UPDATE_HASH(hash, in_buffer, read_index);
             MATCH_HASH(hash, read_index, in_buffer, in_size - read_index, &curr_len, &curr_pos);
             INSERT_HASH(hash, read_index);
