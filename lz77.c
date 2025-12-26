@@ -55,15 +55,8 @@ do { \
     *best_len = cur_best; \
 } while(0)
 
-typedef struct {
-    unsigned int flag: 1;
-    unsigned int distance: 15;
-    unsigned int length: 8;
-} Match;
-
-static Match find_longest_match(const unsigned char *buffer, const uint64_t pos, const uint64_t buffer_size, int hash) {
-    Match match = {.flag = 0};
-    if (pos + MIN_MATCH > buffer_size) return match;
+static int find_longest_match(const unsigned char *buffer, const uint64_t pos, const uint64_t buffer_size, int hash, uint64_t* distance, uint64_t* length) {
+    if (pos + MIN_MATCH > buffer_size) return 0;
     int best_len = 0;
     int64_t best_pos = -1;
 
@@ -71,11 +64,11 @@ static Match find_longest_match(const unsigned char *buffer, const uint64_t pos,
     INSERT_HASH(hash, pos);
 
     if (best_len >= MIN_MATCH && best_pos >= 0 && best_pos < (int64_t)pos && pos - best_pos < 0x7FFF) {
-        match.flag = 1;
-        match.distance = pos - best_pos;
-        match.length = (best_len > 255) ? 255 : (uint8_t)best_len;
+        *distance = pos - best_pos;
+        *length = (best_len > 255) ? 255 : (uint8_t)best_len;
+        return 1;
     }
-    return match;
+    return 0;
 }
 
 typedef struct {
@@ -147,22 +140,22 @@ unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, 
             continue;
         }
         UPDATE_HASH(hash, in_buffer[read_index + MIN_MATCH - 1]);
-        const Match match = find_longest_match(in_buffer, read_index, in_size, hash);
-        WRITE_BITS(&bit_buffer, match.flag, 1);
-        if (match.flag == 0) {
-            WRITE_BITS(&bit_buffer, in_buffer[read_index], 8);
-            read_index++;
-        } else {
-            WRITE_BITS(&bit_buffer, match.distance, 15);
-            WRITE_BITS(&bit_buffer, match.length, 8);
-
-            for (uint32_t k = 1; k < match.length; k++) {
+        uint64_t m_distance, m_length;
+        const int match = find_longest_match(in_buffer, read_index, in_size, hash, &m_distance, &m_length);
+        WRITE_BITS(&bit_buffer, match, 1);
+        if (match) {
+            WRITE_BITS(&bit_buffer,  m_length|m_distance, 15);
+            WRITE_BITS(&bit_buffer, m_length, 8);
+            for (uint32_t k = 1; k < m_length; k++) {
                 read_index++;
                 if (read_index + MIN_MATCH - 1 < in_size) {
                     UPDATE_HASH(hash, in_buffer[read_index + MIN_MATCH - 1]);
                     INSERT_HASH(hash, read_index);
                 }
             }
+            read_index++;
+        } else {
+            WRITE_BITS(&bit_buffer, in_buffer[read_index], 8);
             read_index++;
         }
     }
