@@ -144,7 +144,7 @@ unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, 
         const int match = find_longest_match(in_buffer, read_index, in_size, hash, &m_distance, &m_length);
         WRITE_BITS(&bit_buffer, match, 1);
         if (match) {
-            WRITE_BITS(&bit_buffer,  m_length|m_distance, 15);
+            WRITE_BITS(&bit_buffer, m_distance, 15);
             WRITE_BITS(&bit_buffer, m_length, 8);
             for (uint32_t k = 1; k < m_length; k++) {
                 read_index++;
