@@ -3,20 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef struct {
-    int l_type;
-    unsigned char l_data;
-    int r_type;
-    unsigned char r_data;
-} ReadNode;
-
-void init_read_node(ReadNode *read_node, int l_type, unsigned char l_data, int r_type, unsigned char r_data) {
-    read_node->l_type = l_type;
-    read_node->l_data = l_data;
-    read_node->r_type = r_type;
-    read_node->r_data = r_data;
-}
+#include "bit_buffer.h"
 
 typedef struct HuffmanTree{
     unsigned char symbol;
@@ -25,16 +12,7 @@ typedef struct HuffmanTree{
     struct HuffmanTree* right;
 }HuffmanTree;
 
-void init_huffman_tree(HuffmanTree* tree, HuffmanTree* left, HuffmanTree* right, unsigned char symbol) {
-    tree->symbol = symbol;
-    tree->left = left;
-    tree->right = right;
-    tree->number = -1;
-}
-
-int is_leaf(const HuffmanTree* tree) {
-    return tree->left == NULL && tree->right == NULL;
-}
+#define is_leaf(tree) ((tree)->left == NULL && (tree)->right == NULL)
 
 void free_tree(HuffmanTree* tree) {
     if (!tree) return;
@@ -191,54 +169,7 @@ void tree_to_bytes(const HuffmanTree* tree, unsigned char *buffer, size_t* index
     }
 }
 
-typedef struct {
-    uint64_t accumulator;
-    int count;
-    unsigned char* buffer;
-    uint64_t buff_index;
-} BitBuffer;
-
-void init_bit_buffer(BitBuffer* bit_buffer, unsigned char* buffer, const uint64_t buff_index) {
-    bit_buffer->accumulator = 0;
-    bit_buffer->count = 0;
-    bit_buffer->buffer = buffer;
-    bit_buffer->buff_index = buff_index;
-}
-
-#define WRITE_BITS(bb, val, nbits) do { \
-    (bb)->accumulator |= (uint64_t)(val) << (64 - (nbits) - (bb)->count); \
-    (bb)->count += (nbits); \
-    while ((bb)->count >= 8) { \
-        (bb)->buffer[(bb)->buff_index++] = (bb)->accumulator >> 56; \
-        (bb)->accumulator <<= 8; \
-        (bb)->count -= 8; \
-    } \
-} while(0)
-
-#define READ_BITS(bit_buffer, result, nbits) \
-    do { \
-        int _n = (nbits); \
-        while ((bit_buffer)->count < _n) { \
-            (bit_buffer)->accumulator = ((bit_buffer)->accumulator << 8) | (bit_buffer)->buffer[(bit_buffer)->buff_index++]; \
-            (bit_buffer)->count += 8; \
-        } \
-        int _shift = (bit_buffer)->count - _n; \
-        (result) = ((bit_buffer)->accumulator >> _shift) & ((1ULL << _n) - 1); \
-        (bit_buffer)->count = _shift; \
-        if ((bit_buffer)->count > 0) \
-            (bit_buffer)->accumulator &= (1ULL << (bit_buffer)->count) - 1; \
-        else \
-            (bit_buffer)->accumulator = 0; \
-    } while (0)
-
-#define FLUSH_BITS(bit_buffer) \
-    if ((bit_buffer)->count > 0) { \
-        (bit_buffer)->buffer[(bit_buffer)->buff_index++] = (unsigned char)((bit_buffer)->accumulator << (8 - (bit_buffer)->count)); \
-        (bit_buffer)->count = 0; \
-        (bit_buffer)->accumulator = 0; \
-    }
-
-unsigned char* compress(const unsigned char *in_buffer, size_t in_size, size_t *out_size) {
+unsigned char* huffman_compress(const unsigned char *in_buffer, size_t in_size, size_t *out_size) {
     unsigned char* out_buffer = malloc((in_size * 255 + 7) / 8 + 1029);
     if (!out_buffer) return NULL;
 
@@ -302,7 +233,31 @@ HuffmanTree* rebuild_huffman_tree(unsigned char* buffer, int index) {
     return root;
 }
 
-unsigned char *decompress(const unsigned char *in_buffer, size_t in_size, size_t *out_size) {
+typedef struct {
+    unsigned char symbol;
+    int length;
+} HuffmanDecode;
+
+void get_decodes(HuffmanTree* tree, const uint32_t code, const int len, HuffmanDecode* decodes) {
+    if (!tree) return;
+
+    if (is_leaf(tree)) {
+        if (len <= 12) {
+            int remaining = 12 - len;
+            int num_entries = 1 << remaining;
+            for (int i = 0; i < num_entries; i++) {
+                const uint32_t index = (code << remaining) | i;
+                decodes[index].symbol = tree->symbol;
+                decodes[index].length = len;
+            }
+        }
+        return;
+    }
+    get_decodes(tree->left, (code << 1), len + 1, decodes);
+    get_decodes(tree->right, (code << 1) | 1, len + 1, decodes);
+}
+
+unsigned char *huffman_decompress(const unsigned char *in_buffer, size_t in_size, size_t *out_size) {
     if (in_size < 5) return NULL;
     size_t write_index = 0, read_index = 0;
     int num_nodes = in_buffer[read_index++];
@@ -327,15 +282,39 @@ unsigned char *decompress(const unsigned char *in_buffer, size_t in_size, size_t
 
     BitBuffer bit_buffer;
     init_bit_buffer(&bit_buffer, (unsigned char*)in_buffer, read_index);
-    const HuffmanTree* curr = tree;
+
+    HuffmanDecode decodes[4096] = {0};
+    get_decodes(tree, 0, 0, decodes);
+
     while (write_index < original_size) {
-        while (!is_leaf(curr)) {
-            int bit;
-            READ_BITS(&bit_buffer, bit, 1);
-            curr = (bit == 0) ? curr->left : curr->right;
+        while (bit_buffer.count <= 56 && bit_buffer.buff_index < in_size) {
+            bit_buffer.accumulator |= (uint64_t)in_buffer[bit_buffer.buff_index++] << (56 - bit_buffer.count);
+            bit_buffer.count += 8;
         }
-        out_buffer[write_index++] = curr->symbol;
-        curr = tree;
+        uint32_t peek = (uint32_t)(bit_buffer.accumulator >> 52);
+        HuffmanDecode entry = decodes[peek];
+
+        if (entry.length == 0) {
+            const HuffmanTree* curr = tree;
+            while (!is_leaf(curr)) {
+                uint64_t bit = (bit_buffer.accumulator >> 63);
+                bit_buffer.accumulator <<= 1;
+                bit_buffer.count--;
+
+                curr = (bit == 0) ? curr->left : curr->right;
+
+                // Refill if empty during long walk
+                if (bit_buffer.count == 0 && bit_buffer.buff_index < in_size) {
+                    bit_buffer.accumulator = (uint64_t)in_buffer[bit_buffer.buff_index++] << 56;
+                    bit_buffer.count = 8;
+                }
+            }
+            out_buffer[write_index++] = curr->symbol;
+        } else {
+            out_buffer[write_index++] = entry.symbol;
+            bit_buffer.accumulator <<= entry.length;
+            bit_buffer.count -= entry.length;
+        }
     }
     free_tree(tree);
     *out_size = write_index;

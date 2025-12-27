@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "bit_buffer.h"
 
 #define SEARCH_BUFFER 32767
 #define LOOKAHEAD_BUFFER 256
@@ -13,13 +14,6 @@
 #define MIN_MATCH   3
 #define MAX_MATCH   255
 #define MAX_CHAIN   32
-
-typedef struct {
-    uint64_t accumulator;
-    int count;
-    unsigned char* buffer;
-    uint64_t buff_index;
-} BitBuffer;
 
 static int32_t head[HASH_SIZE];
 
@@ -48,47 +42,7 @@ do { \
     } \
 } while(0)
 
-void init_bit_buffer(BitBuffer* bit_buffer, unsigned char* buffer, const uint64_t buff_index) {
-    bit_buffer->accumulator = 0;
-    bit_buffer->count = 0;
-    bit_buffer->buffer = buffer;
-    bit_buffer->buff_index = buff_index;
-}
-
-#define WRITE_BITS(bb, val, nbits) do { \
-    (bb)->accumulator |= (uint64_t)(val) << (64 - (nbits) - (bb)->count); \
-    (bb)->count += (nbits); \
-    while ((bb)->count >= 8) { \
-        (bb)->buffer[(bb)->buff_index++] = (bb)->accumulator >> 56; \
-        (bb)->accumulator <<= 8; \
-        (bb)->count -= 8; \
-    } \
-} while(0)
-
-#define READ_BITS(bit_buffer, result, nbits) \
-    do { \
-        int _n = (nbits); \
-        while ((bit_buffer)->count < _n) { \
-            (bit_buffer)->accumulator = ((bit_buffer)->accumulator << 8) | (bit_buffer)->buffer[(bit_buffer)->buff_index++]; \
-            (bit_buffer)->count += 8; \
-        } \
-        int _shift = (bit_buffer)->count - _n; \
-        (result) = ((bit_buffer)->accumulator >> _shift) & ((1ULL << _n) - 1); \
-        (bit_buffer)->count = _shift; \
-        if ((bit_buffer)->count > 0) \
-            (bit_buffer)->accumulator &= (1ULL << (bit_buffer)->count) - 1; \
-        else \
-            (bit_buffer)->accumulator = 0; \
-    } while (0)
-
-#define FLUSH_BITS(bit_buffer) \
-    if ((bit_buffer)->count > 0) { \
-        (bit_buffer)->buffer[(bit_buffer)->buff_index++] = (unsigned char)((bit_buffer)->accumulator << (8 - (bit_buffer)->count)); \
-        (bit_buffer)->count = 0; \
-        (bit_buffer)->accumulator = 0; \
-    }
-
-unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, uint64_t *out_size) {
+unsigned char *lz77_compress(const unsigned char *in_buffer, const uint64_t in_size, uint64_t *out_size) {
     INIT_HASH();
     unsigned char *out_buffer = malloc(in_size + (in_size / 8) + 9);
     if (!out_buffer) return NULL;
@@ -156,7 +110,7 @@ unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, 
     return out_buffer;
 }
 
-unsigned char *decompress(const unsigned char *in_buffer, const uint64_t in_size, uint64_t *out_size) {
+unsigned char *lz77_decompress(const unsigned char *in_buffer, const uint64_t in_size, uint64_t *out_size) {
     uint64_t original_size;
     memcpy(&original_size, in_buffer, 8);
     unsigned char *out_buffer = malloc(original_size);
