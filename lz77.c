@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SEARCH_BUFFER 32768
+#define SEARCH_BUFFER 32767
 #define LOOKAHEAD_BUFFER 256
 
 #define HASH_BITS   16
@@ -99,39 +99,49 @@ unsigned char *compress(const unsigned char *in_buffer, const uint64_t in_size, 
 
     uint64_t read_index = 0;
     uint32_t prev_len = 0, prev_dist = 0;
-    int match = 0;
-
+    int match = 0, hash = 0;
     while (read_index < in_size) {
         uint32_t curr_len = 0, curr_pos = -1;
-        if (read_index + 4 <= in_size) {
-            int hash = 0;
+        if (read_index + MIN_MATCH <= in_size) {
             UPDATE_HASH(hash, in_buffer, read_index);
             MATCH_HASH(hash, read_index, in_buffer, in_size - read_index, &curr_len, &curr_pos);
-            INSERT_HASH(hash, read_index);
         }
         if (match) {
             if (curr_len > prev_len) {
                 WRITE_BITS(&bit_buffer, 0, 1);
-                WRITE_BITS(&bit_buffer, in_buffer[read_index], 8);
+                WRITE_BITS(&bit_buffer, in_buffer[read_index - 1], 8);
                 prev_len = curr_len;
                 prev_dist = (int32_t)(read_index - curr_pos);
+                if (read_index < in_size)
+                    INSERT_HASH(hash, read_index);
                 read_index++;
             } else {
                 WRITE_BITS(&bit_buffer, 1, 1);
                 WRITE_BITS(&bit_buffer, prev_dist, 15);
                 WRITE_BITS(&bit_buffer, prev_len, 8);
-                read_index += prev_len - 1;
                 match = 0;
+                uint64_t target_index = (read_index - 1) + prev_len;
+                while (read_index < target_index && read_index < in_size) {
+                    if (read_index + 4 <= in_size) {
+                        int temp_hash;
+                        UPDATE_HASH(temp_hash, in_buffer, read_index);
+                        INSERT_HASH(temp_hash, read_index);
+                    }
+                    read_index++;
+                }
             }
         } else {
             if (curr_len >= MIN_MATCH) {
                 prev_len = curr_len;
                 prev_dist = (int32_t)(read_index - curr_pos);
                 match = 1;
+                INSERT_HASH(hash, read_index);
                 read_index++;
             } else {
                 WRITE_BITS(&bit_buffer, 0, 1);
                 WRITE_BITS(&bit_buffer, in_buffer[read_index], 8);
+                if (read_index + 4 <= in_size)
+                    INSERT_HASH(hash, read_index);
                 read_index++;
             }
         }
