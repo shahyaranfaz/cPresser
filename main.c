@@ -1,5 +1,6 @@
 #include "fileio.h"
 #include "lz77.h"
+#include "huffman.h"
 #include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>

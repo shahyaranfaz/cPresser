@@ -8,4 +8,6 @@ add_executable(cPress main.c
         lz77.h
         fileio.c
         fileio.h
-        )
+        huffman.c
+        huffman.h
+)

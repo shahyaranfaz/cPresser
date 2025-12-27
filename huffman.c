@@ -70,6 +70,7 @@ int is_empty(const PriorityQueue* queue) { return queue->head == NULL; }
 
 void enqueue(PriorityQueue* queue, HuffmanTree* tree, const int frequency) {
     QueueNode* new_node = malloc(sizeof(QueueNode));
+    if (!new_node) return;
     new_node->tree = tree;
     new_node->frequency = frequency;
     if (is_empty(queue)) {
@@ -101,6 +102,7 @@ HuffmanTree* build_huffman_tree(int freq_dict[256]) {
     for (int i = 0; i < 256; i++) {
         if (freq_dict[i] == 0) continue;
         HuffmanTree*tree = malloc(sizeof(HuffmanTree));
+        if (!tree) return NULL;
         tree->symbol = i;
         tree->left = NULL;
         tree->right = NULL;
@@ -108,17 +110,21 @@ HuffmanTree* build_huffman_tree(int freq_dict[256]) {
     }
 
     if (pq.size == 1) {
+        QueueNode* real = dequeue(&pq);
         HuffmanTree* dummy = malloc(sizeof(HuffmanTree));
-        dummy->symbol = (pq.head->tree->symbol + 1) % 256;
+        HuffmanTree* root = malloc(sizeof(HuffmanTree));
+        if (!dummy || !root) {
+            free(dummy); free(root);
+            return NULL;
+        }
+        dummy->symbol = (real->tree->symbol + 1) % 256;
         dummy->left = NULL;
         dummy->right = NULL;
+        root->left = dummy;
+        root->right = real->tree;
 
-        HuffmanTree* tree = malloc(sizeof(HuffmanTree));
-        tree->left = dummy;
-        tree->right = pq.head->tree;
-
-        free(pq.head);
-        return tree;
+        free(real);
+        return root;
     }
 
     while (pq.size > 1) {
@@ -126,6 +132,7 @@ HuffmanTree* build_huffman_tree(int freq_dict[256]) {
         QueueNode* right_node = dequeue(&pq);
         int new_freq = left_node->frequency + right_node->frequency;
         HuffmanTree* new_tree = malloc(sizeof(HuffmanTree));
+        if (!new_tree) return NULL;
         new_tree->left = left_node->tree;
         new_tree->right = right_node->tree;
         enqueue(&pq, new_tree, new_freq);
@@ -163,7 +170,7 @@ int number_nodes(HuffmanTree* tree, int num) {
     return num + 1;
 }
 
-void tree_to_bytes(HuffmanTree* tree, unsigned char *buffer, size_t* index) {
+void tree_to_bytes(const HuffmanTree* tree, unsigned char *buffer, size_t* index) {
     if (tree && !is_leaf(tree)) {
         tree_to_bytes(tree->left, buffer, index);
         tree_to_bytes(tree->right, buffer, index);
@@ -246,7 +253,7 @@ unsigned char* compress(const unsigned char *in_buffer, size_t in_size, size_t *
 
     number_nodes(tree, 0);
     out_buffer[0] = (uint8_t)(tree->number + 1);
-    size_t write_index = 1, read_index = 0;
+    size_t write_index = 1;
     tree_to_bytes(tree, out_buffer, &write_index);
 
     const uint32_t length = (uint32_t)in_size;
@@ -268,62 +275,69 @@ unsigned char* compress(const unsigned char *in_buffer, size_t in_size, size_t *
     return out_buffer;
 }
 
-unsigned char *decompress(const unsigned char *in_buffer, size_t in_size, size_t *out_size) { return NULL; }
+//DECOMPRESS
+HuffmanTree* rebuild_huffman_tree(unsigned char* buffer, int index) {
+    HuffmanTree* root = malloc(sizeof(HuffmanTree));
+    if (!root ) { free_tree(root); return NULL; }
+    if (buffer[4 * index] == 0) {
+        HuffmanTree* left = malloc(sizeof(HuffmanTree));
+        if (!left ) { free_tree(root); free_tree(left); return NULL; }
+        left->symbol = buffer[4 * index + 1];
+        left->left = NULL;
+        left->right = NULL;
+        root->left = left;
+    } else {
+        root->left = rebuild_huffman_tree(buffer, buffer[4 * index + 1]);
+    }
+    if (buffer[4 * index + 2] == 0) {
+        HuffmanTree* right = malloc(sizeof(HuffmanTree));
+        if (!right ) { free_tree(root); free_tree(right); return NULL; }
+        right->symbol = buffer[4 * index + 3];
+        right->left = NULL;
+        right->right = NULL;
+        root->right = right;
+    } else {
+        root->right = rebuild_huffman_tree(buffer, buffer[4 * index + 3]);
+    }
+    return root;
+}
 
-/*
-# ====================
-# Functions for decompression
+unsigned char *decompress(const unsigned char *in_buffer, size_t in_size, size_t *out_size) {
+    if (in_size < 5) return NULL;
+    size_t write_index = 0, read_index = 0;
+    int num_nodes = in_buffer[read_index++];
+    HuffmanTree* tree = rebuild_huffman_tree((unsigned char*)in_buffer + 1, num_nodes - 1);
+    if (!tree) return NULL;
+    read_index += 4 * num_nodes;
 
-def _generate_tree_general(node_lst: list[ReadNode],
-                           root_index: int) -> HuffmanTree:
-    """ Return the Huffman tree corresponding to node_lst[root_index].
-    The function assumes nothing about the order of the tree nodes in the list.
-    """
-    root = HuffmanTree()
-    node_values = node_lst[root_index]
-    if node_values.l_type == 0:
-        root.left = HuffmanTree(symbol=node_values.l_data)
-    else:
-        root.left = _generate_tree_general(node_lst, node_values.l_data)
-    if node_values.r_type == 0:
-        root.right = HuffmanTree(symbol=node_values.r_data)
-    else:
-        root.right = _generate_tree_general(node_lst, node_values.r_data)
-    return root
+    if (read_index + 4 > in_size) {
+        free_tree(tree);
+        return NULL;
+    }
 
+    uint32_t original_size;
+    memcpy(&original_size, &in_buffer[read_index], 4);
+    read_index += 4;
 
-def _decompress_bytes(tree: HuffmanTree, text: bytes, size: int) -> bytes:
-    """ Use Huffman tree <tree> to decompress <size> bytes from <text>."""
-    codes = {value: key for key, value in _get_codes(tree).items()}
-    binary_string = "".join(bin(byte)[2:].zfill(8) for byte in text)
-    output = bytearray()
-    curr = ""
-    for char in binary_string:
-        curr += char
-        if curr in codes:
-            output.append(codes[curr])
-            curr = ""
-    return bytes(output[:size])
+    unsigned char* out_buffer = malloc(original_size);
+    if (!out_buffer) {
+        free_tree(tree);
+        return NULL;
+    }
 
-
-def _bytes_to_nodes(buf: bytes) -> list[ReadNode]:
-    """ Return a list of ReadNodes corresponding to the bytes in <buf>."""
-    return [ReadNode(buf[i], buf[i + 1], buf[i + 2], buf[i + 3]) for i in range(0, len(buf), 4)]
-
-
-def decompress_file(in_file: str, out_file: str) -> None:
-    """ Decompress contents of <in_file> and store results in <out_file>.
-    Both <in_file> and <out_file> are string objects representing the names of
-    the input and output files.
-
-    Precondition: The contents of the file <in_file> are not empty.
-    """
-    with open(in_file, "rb") as f:
-        num_nodes = f.read(1)[0]
-        buf = f.read(num_nodes * 4)
-        node_lst = _bytes_to_nodes(buf)
-        tree = _generate_tree_general(node_lst, num_nodes - 1)
-        size = int.from_bytes(f.read(4), "little")
-        with open(out_file, "wb") as g:
-            text = f.read()
-            g.write(_decompress_bytes(tree, text, size))*/
+    BitBuffer bit_buffer;
+    init_bit_buffer(&bit_buffer, (unsigned char*)in_buffer, read_index);
+    const HuffmanTree* curr = tree;
+    while (write_index < original_size) {
+        while (!is_leaf(curr)) {
+            int bit;
+            READ_BITS(&bit_buffer, bit, 1);
+            curr = (bit == 0) ? curr->left : curr->right;
+        }
+        out_buffer[write_index++] = curr->symbol;
+        curr = tree;
+    }
+    free_tree(tree);
+    *out_size = write_index;
+    return out_buffer;
+}
