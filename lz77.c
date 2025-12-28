@@ -4,24 +4,28 @@
 #include <string.h>
 #include "bit_buffer.h"
 
-#define SEARCH_BUFFER 32767
-#define LOOKAHEAD_BUFFER 256
+#define SEARCH_BUFFER 32768
+#define SEARCH_MASK (SEARCH_BUFFER - 1)
 
 #define HASH_BITS   16
 #define HASH_SIZE   (1 << HASH_BITS)
 #define HASH_MASK   (HASH_SIZE - 1)
 #define HASH_SHIFT  5
+
 #define MIN_MATCH   3
 #define MAX_MATCH   255
-#define MAX_CHAIN   32
 
 static int32_t head[HASH_SIZE];
 
 #define INIT_HASH() (memset(head, -1, sizeof(head)))
 
 #define UPDATE_HASH(hash, buffer, pos) do { \
-    uint32_t _val = *(uint32_t*)(buffer + pos); \
-    hash = (_val * 0x1E35A7BD) >> (32 - HASH_BITS); \
+    uint32_t v; \
+    memcpy(&v, (buffer) + (pos), 4); \
+    v ^= v >> 16; \
+    v *= 0x7feb352d; \
+    v ^= v >> 15; \
+    hash = v & HASH_MASK; \
 } while(0)
 
 #define INSERT_HASH(hash, pos) (head[hash] = (int32_t)(pos))

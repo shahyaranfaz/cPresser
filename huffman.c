@@ -303,7 +303,6 @@ unsigned char *huffman_decompress(const unsigned char *in_buffer, size_t in_size
 
                 curr = (bit == 0) ? curr->left : curr->right;
 
-                // Refill if empty during long walk
                 if (bit_buffer.count == 0 && bit_buffer.buff_index < in_size) {
                     bit_buffer.accumulator = (uint64_t)in_buffer[bit_buffer.buff_index++] << 56;
                     bit_buffer.count = 8;

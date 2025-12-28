@@ -10,4 +10,7 @@ add_executable(cPress main.c
         fileio.h
         huffman.c
         huffman.h
+        bit_buffer.h
+        test_files/test.c
+        test_files/lz77_test_debug.c
 )

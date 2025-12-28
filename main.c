@@ -44,17 +44,41 @@ int main(void) {
             continue;
         }
 
-        size_t write_size;
-        unsigned char* out_buffer;
+        size_t temp_size1, temp_size2;
+        unsigned char *temp_buffer1 = NULL, *temp_buffer2 = NULL;
         char output_filename[300];
 
         clock_t start_time = clock();
 
         if (mode == 'C') {
-            out_buffer = compress(buffer, read_size, &write_size);
+            temp_buffer1 = lz77_compress(buffer, read_size, &temp_size1);
+            if (!temp_buffer1) {
+                printf("Error: LZ77 compression failed\n");
+                free(buffer);
+                continue;
+            }
+            temp_buffer2 = huffman_compress(temp_buffer1, temp_size1, &temp_size2);
+            free(temp_buffer1);
+            if (!temp_buffer2) {
+                printf("Error: Huffman compression failed\n");
+                free(buffer);
+                continue;
+            }
             snprintf(output_filename, sizeof(output_filename), "%s.cmp", input_filename);
         } else {
-            out_buffer = decompress(buffer, read_size, &write_size);
+            temp_buffer1 = huffman_decompress(buffer, read_size, &temp_size1);
+            if (!temp_buffer1) {
+                printf("Error: Huffman decompression failed\n");
+                free(buffer);
+                continue;
+            }
+            temp_buffer2 = lz77_decompress(temp_buffer1, temp_size1, &temp_size2);
+            free(temp_buffer1);
+            if (!temp_buffer2) {
+                printf("Error: LZ77 decompression failed\n");
+                free(buffer);
+                continue;
+            }
             const size_t len = strlen(input_filename);
             if (len > 4 && strcmp(input_filename + len - 4, ".cmp") == 0) {
                 strncpy(output_filename, input_filename, len - 4);
@@ -63,21 +87,12 @@ int main(void) {
                 snprintf(output_filename, sizeof(output_filename), "%s.out", input_filename);
             }
         }
-
-        if (!out_buffer) {
-            printf("Error: %s failed\n", mode == 'C' ? "Compression" : "Decompression");
-            free(buffer);
-            continue;
-        }
-
-        write_file(output_filename, out_buffer, &write_size);
-
+        write_file(output_filename, temp_buffer2, &temp_size2);
         clock_t end_time = clock();
-        printf("Success! Output written to '%s' (%zu bytes, %.3f seconds)\n", output_filename, write_size, (double)(end_time - start_time) / CLOCKS_PER_SEC);
-
-        free(out_buffer);
+        printf("Success! Output written to '%s' (%zu bytes, %.3f seconds)\n",
+               output_filename, temp_size2, (double)(end_time - start_time) / CLOCKS_PER_SEC);
+        free(temp_buffer2);
         free(buffer);
     }
-
     return 0;
 }

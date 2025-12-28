@@ -45,7 +45,7 @@ static inline void init_bit_buffer(BitBuffer* bit_buffer, unsigned char* buffer,
 
 #define FLUSH_BITS(bit_buffer) \
     if ((bit_buffer)->count > 0) { \
-        (bit_buffer)->buffer[(bit_buffer)->buff_index++] = (unsigned char)((bit_buffer)->accumulator << (8 - (bit_buffer)->count)); \
+        (bit_buffer)->buffer[(bit_buffer)->buff_index++] = (unsigned char)((bit_buffer)->accumulator >> 56); \
         (bit_buffer)->count = 0; \
         (bit_buffer)->accumulator = 0; \
     }
