@@ -1,4 +1,6 @@
 #include "fileio.h"
+#include "xor_delta.h"
+#include "rle.h"
 #include "lz77.h"
 #include "huffman.h"
 #include <ctype.h>
@@ -7,9 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-#include "rle.h"
-#include "xor_delta.h"
 
 #define MAX_FILE_SIZE 1000000000
 
@@ -222,7 +221,8 @@ int main() {
             snprintf(output_filename, sizeof(output_filename), "%s.cPressed", input_filename);
         } else {
             output_size = decompress_file(input_filename);
-            snprintf(output_filename, sizeof(output_filename), "%s.original", input_filename);}
+            snprintf(output_filename, sizeof(output_filename), "%s.original", input_filename);
+        }
         clock_t end_time = clock();
 
         if (output_size == 0) continue;
