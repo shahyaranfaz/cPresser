@@ -104,7 +104,7 @@ size_t compress_file(const char* file_name) {
     write_buffer[3] = settings.lz77;
 
     char output_name[512];
-    snprintf(output_name, sizeof(output_name), "%s.cmp", file_name);
+    snprintf(output_name, sizeof(output_name), "%s.cPressed", file_name);
     size_t written = write_file(output_name, write_buffer, compressed_size + 4);
 
     free(write_buffer);
@@ -182,7 +182,7 @@ size_t decompress_file(const char* file_name) {
     }
 
     char output_name[512];
-    snprintf(output_name, sizeof(output_name), "%s.dcmp", file_name);
+    snprintf(output_name, sizeof(output_name), "%s.original", file_name);
     size_t written = write_file(output_name, decompressed_file, decompressed_size);
     if (compressions != 0) free(decompressed_file);
     free(original_file);
@@ -219,10 +219,10 @@ int main() {
 
         if (mode == 'C') {
             output_size = compress_file(input_filename);
-            snprintf(output_filename, sizeof(output_filename), "%s.cmp", input_filename);
+            snprintf(output_filename, sizeof(output_filename), "%s.cPressed", input_filename);
         } else {
             output_size = decompress_file(input_filename);
-            snprintf(output_filename, sizeof(output_filename), "%s.dcmp", input_filename);}
+            snprintf(output_filename, sizeof(output_filename), "%s.original", input_filename);}
         clock_t end_time = clock();
 
         if (output_size == 0) continue;
