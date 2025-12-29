@@ -58,29 +58,24 @@ unsigned char *read_file(const char *filename, size_t *read_size) {
     return buffer;
 }
 
-void write_file(const char *filename, unsigned char* buffer, size_t *write_size) {
-    if (!buffer || !write_size || *write_size == 0) return;
+size_t write_file(const char *filename, const unsigned char* buffer, const size_t write_size) {
     FILE *fp = fopen(filename, "wb");
-    if (!fp) {
-        perror("Error opening file");
-        return;
-    }
+    if (!fp) return 0;
+
     size_t total_written = 0;
-    while (total_written < *write_size) {
-        size_t to_write = *write_size - total_written;
+    while (total_written < write_size) {
+        size_t to_write = write_size - total_written;
         if (to_write > CHUNK_SIZE)
             to_write = CHUNK_SIZE;
         const size_t bytes = fwrite(buffer + total_written, 1, to_write, fp);
         if (bytes == 0) {
             if (ferror(fp))
                 perror("Error writing file");
-            break;
+            fclose(fp);
+            return total_written;
         }
         total_written += bytes;
     }
-    if (total_written != *write_size) {
-        fprintf(stderr, "Warning: wrote %zu of %zu bytes\n", total_written, *write_size);
-    }
     fclose(fp);
-    *write_size = total_written;
+    return total_written;
 }

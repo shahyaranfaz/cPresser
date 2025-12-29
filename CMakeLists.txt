@@ -3,7 +3,7 @@ project(cPress C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(cPress main.c
+add_executable(cPress cPresser.c
         lz77.c
         lz77.h
         fileio.c
