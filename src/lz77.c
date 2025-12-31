@@ -1,8 +1,9 @@
 #include "lz77.h"
+#include "bit_buffer.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "bit_buffer.h"
 
 #define SEARCH_BUFFER 32768
 #define SEARCH_MASK (SEARCH_BUFFER - 1)
