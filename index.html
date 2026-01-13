@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cPresser - File Compression Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 60px 20px;
+            color: white;
+        }
+
+        h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .tagline {
+            font-size: 1.3em;
+            margin-bottom: 30px;
+            opacity: 0.95;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 35px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            color: #667eea;
+        }
+
+        .content {
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            margin-top: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .feature-card {
+            padding: 30px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+
+        .section {
+            margin: 50px 0;
+        }
+
+        .section h2 {
+            color: #667eea;
+            font-size: 2.2em;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .algorithms {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .algorithm-box {
+            padding: 25px;
+            border-left: 4px solid #764ba2;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .algorithm-box h4 {
+            color: #764ba2;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #e83e8c;
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 25px;
+            border-radius: 10px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-block pre {
+            margin: 0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: white;
+            margin-top: 50px;
+        }
+
+        footer a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5em;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🗜️ cPresser</h1>
+            <p class="tagline">High-Performance Multi-Algorithm File Compression</p>
+            <div class="btn-group">
+                <a href="https://github.com/shahyaranfaz/cPresser" class="btn btn-primary">View on GitHub</a>
+                <a href="https://github.com/shahyaranfaz/cPresser/archive/refs/heads/main.zip" class="btn btn-secondary">Download</a>
+            </div>
+        </header>
+
+        <div class="content">
+            <section class="section">
+                <h2>About</h2>
+                <p>cPresser is a powerful file compression tool written in C that intelligently combines multiple compression algorithms to achieve optimal file size reduction. It automatically selects and applies the best combination of compression techniques for your data.</p>
+            </section>
+
+            <section class="section">
+                <h2>✨ Key Features</h2>
+                <div class="features">
+                    <div class="feature-card">
+                        <div class="feature-icon">🔄</div>
+                        <h3>Multi-Algorithm</h3>
+                        <p>Combines Delta, RLE, Huffman, and LZ77 compression</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🧠</div>
+                        <h3>Smart Optimization</h3>
+                        <p>Only applies algorithms that reduce file size</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>High Performance</h3>
+                        <p>Optimized C implementation for speed</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">💯</div>
+                        <h3>Lossless</h3>
+                        <p>Perfect reconstruction of original files</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📦</div>
+                        <h3>Large Files</h3>
+                        <p>Handles files up to 1GB</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🖥️</div>
+                        <h3>Easy CLI</h3>
+                        <p>Simple command-line interface</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>🚀 Quick Start</h2>
+                <div class="code-block">
+                    <pre>
+# Clone the repository
+git clone https://github.com/shahyaranfaz/cPresser.git
+cd cPresser
+
+# Build the project
+mkdir build && cd build
+cmake ..
+make
+
+# Run cPresser
+./cPress</pre>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>📖 Usage</h2>
+                <p>cPresser provides an interactive interface:</p>
+                <div class="code-block">
+                    <pre>
+Welcome to cPresser!
+
+Compress (c), Decompress (d), or Exit (x): c
+Enter filename: myfile.txt
+Success! Output written to 'myfile.txt.cPressed' (1234 bytes, 0.045 seconds)</pre>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>🔧 Compression Algorithms</h2>
+                <div class="algorithms">
+                    <div class="algorithm-box">
+                        <h4>Delta (XOR) Encoding</h4>
+                        <p>Reduces redundancy by storing XOR differences between consecutive bytes, ideal for data with gradual changes.</p>
+                    </div>
+                    <div class="algorithm-box">
+                        <h4>Run-Length Encoding</h4>
+                        <p>Compresses sequences of repeated bytes efficiently. Perfect for data with long runs of identical values.</p>
+                    </div>
+                    <div class="algorithm-box">
+                        <h4>Huffman Coding</h4>
+                        <p>Variable-length encoding based on symbol frequency. Assigns shorter codes to common symbols.</p>
+                    </div>
+                    <div class="algorithm-box">
+                        <h4>LZ77 Compression</h4>
+                        <p>Dictionary-based compression that finds and replaces repeated patterns with references.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>📊 How It Works</h2>
+                <p>cPresser uses an intelligent pipeline approach:</p>
+                <ol style="padding-left: 20px; margin-top: 15px; line-height: 1.8;">
+                    <li>Reads the input file into memory</li>
+                    <li>Tests each compression algorithm sequentially</li>
+                    <li>Keeps only algorithms that reduce file size</li>
+                    <li>Stores compression settings in the output file header</li>
+                    <li>Writes the compressed data with <code>.cPressed</code> extension</li>
+                </ol>
+                <p style="margin-top: 20px;">During decompression, cPresser reads the header and applies the reverse algorithms in the correct order to perfectly reconstruct the original file.</p>
+            </section>
+
+            <section class="section">
+                <h2>📄 License</h2>
+                <p>This project is licensed under the MIT License. See the <a href="https://github.com/shahyaranfaz/cPresser/blob/main/LICENSE" style="color: #667eea;">LICENSE</a> file for details.</p>
+            </section>
+        </div>
+
+        <footer>
+            <p>Created by <a href="https://github.com/shahyaranfaz">Shahyar Anfaz</a> (and Claude)</p>
+            <p style="margin-top: 10px;">© 2026 cPresser</p>
+        </footer>
+    </div>
+</body>
+</html>
