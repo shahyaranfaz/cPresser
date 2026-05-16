@@ -20,6 +20,73 @@ typedef struct {
     int lz77;
 } Settings;
 
+typedef struct {
+    unsigned char* data;
+    size_t size;
+    Settings settings;
+    int owns_data;
+} CompressionResult;
+
+static void free_compression_result(CompressionResult* result) {
+    if (result->owns_data) free(result->data);
+    result->data = NULL;
+    result->size = 0;
+    result->owns_data = 0;
+}
+
+static CompressionResult compress_stages(const unsigned char* input,
+                                         const size_t input_size,
+                                         const Settings initial_settings) {
+    CompressionResult result = {
+        .data = (unsigned char*)input,
+        .size = input_size,
+        .settings = initial_settings,
+        .owns_data = 0
+    };
+
+    size_t rle_size = rle_compressed_size(result.data, result.size);
+    if (rle_size < result.size) {
+        unsigned char* rle_compressed = rle_compress(result.data, result.size, &rle_size);
+        if (rle_compressed != NULL) {
+            free_compression_result(&result);
+            result.data = rle_compressed;
+            result.size = rle_size;
+            result.settings.rle = 1;
+            result.owns_data = 1;
+        }
+    }
+
+    size_t huffman_size = 0;
+    unsigned char* huffman_compressed = huffman_compress(result.data, result.size, &huffman_size);
+    if (huffman_compressed != NULL){
+        if (huffman_size < result.size) {
+            free_compression_result(&result);
+            result.data = huffman_compressed;
+            result.size = huffman_size;
+            result.settings.huffman = 1;
+            result.owns_data = 1;
+        } else {
+            free(huffman_compressed);
+        }
+    }
+
+    size_t lz77_size = 0;
+    unsigned char* lz77_compressed = lz77_compress(result.data, result.size, &lz77_size);
+    if (lz77_compressed != NULL) {
+        if (lz77_size < result.size) {
+            free_compression_result(&result);
+            result.data = lz77_compressed;
+            result.size = lz77_size;
+            result.settings.lz77 = 1;
+            result.owns_data = 1;
+        } else {
+            free(lz77_compressed);
+        }
+    }
+
+    return result;
+}
+
 size_t compress_file(const char* file_name) {
     size_t original_size;
     unsigned char* original_file = read_file(file_name, &original_size);
@@ -34,81 +101,43 @@ size_t compress_file(const char* file_name) {
         return 0;
     }
 
-    unsigned char* compressed_file = original_file;
-    size_t compressed_size = original_size;
     Settings settings = {0};
+    CompressionResult best = compress_stages(original_file, original_size, settings);
 
     size_t delta_size = 0;
-    unsigned char* delta_compressed = delta_compress(original_file, compressed_size, &delta_size);
-    if (delta_compressed != NULL){
-        if (delta_size < compressed_size) {
-            compressed_file = delta_compressed;
-            compressed_size = delta_size;
-            settings.delta = 1;
+    unsigned char* delta_file = delta_compress(original_file, original_size, &delta_size);
+    if (delta_file != NULL) {
+        Settings delta_settings = {.delta = 1, .rle = 0, .huffman = 0, .lz77 = 0};
+        CompressionResult delta_result = compress_stages(delta_file, delta_size, delta_settings);
+        if (delta_result.size < best.size) {
+            free_compression_result(&best);
+            best = delta_result;
         } else {
-            free(delta_compressed);
+            free_compression_result(&delta_result);
         }
+        free(delta_file);
     }
 
-    size_t rle_size = 0;
-    unsigned char* rle_compressed = rle_compress(compressed_file, compressed_size, &rle_size);
-    if (rle_compressed != NULL){
-        if (rle_size < compressed_size) {
-            if (compressed_file != original_file) free(compressed_file);
-            compressed_file = rle_compressed;
-            compressed_size = rle_size;
-            settings.rle = 1;
-        } else {
-            free(rle_compressed);
-        }
-    }
-
-    size_t huffman_size = 0;
-    unsigned char* huffman_compressed = huffman_compress(compressed_file, compressed_size, &huffman_size);
-    if (huffman_compressed != NULL){
-        if (huffman_size < compressed_size) {
-            if (compressed_file != original_file) free(compressed_file);
-            compressed_file = huffman_compressed;
-            compressed_size = huffman_size;
-            settings.huffman = 1;
-        } else {
-            free(huffman_compressed);
-        }
-    }
-
-    size_t lz77_size = 0;
-    unsigned char* lz77_compressed = lz77_compress(compressed_file, compressed_size, &lz77_size);
-    if (lz77_compressed != NULL) {
-        if (lz77_size < compressed_size) {
-            if (compressed_file != original_file) free(compressed_file);
-            compressed_file = lz77_compressed;
-            compressed_size = lz77_size;
-            settings.lz77 = 1;
-        } else {
-            free(lz77_compressed);
-        }
-    }
-
-    unsigned char* write_buffer = malloc(compressed_size + 4);
+    unsigned char* write_buffer = malloc(best.size + 4);
     if (!write_buffer) {
         printf("Error allocating memory for compression\n");
-        if (compressed_file != original_file) free(compressed_file);
+        free_compression_result(&best);
         free(original_file);
         return 0;
     }
 
-    memcpy(write_buffer + 4, compressed_file, compressed_size);
-    write_buffer[0] = settings.delta;
-    write_buffer[1] = settings.rle;
-    write_buffer[2] = settings.huffman;
-    write_buffer[3] = settings.lz77;
+    memcpy(write_buffer + 4, best.data, best.size);
+    write_buffer[0] = best.settings.delta;
+    write_buffer[1] = best.settings.rle;
+    write_buffer[2] = best.settings.huffman;
+    write_buffer[3] = best.settings.lz77;
 
     char output_name[512];
     snprintf(output_name, sizeof(output_name), "%s.cPressed", file_name);
-    size_t written = write_file(output_name, write_buffer, compressed_size + 4);
+    size_t written = write_file(output_name, write_buffer, best.size + 4);
 
     free(write_buffer);
-    if (compressed_file != original_file) free(compressed_file);
+    free_compression_result(&best);
     free(original_file);
 
     return written;
@@ -196,7 +225,10 @@ int main() {
     while (1) {
         printf("\nCompress (c), Decompress (d), or Exit (x): ");
         char mode;
-        scanf(" %c", &mode);
+        if (scanf(" %c", &mode) != 1) {
+            printf("Error reading mode.\n");
+            break;
+        }
         mode = (char) toupper((unsigned char) mode);
 
         if (mode == 'X') break;

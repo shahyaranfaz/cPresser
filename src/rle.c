@@ -5,6 +5,23 @@
 #include <stdlib.h>
 #define MAX_RUN 255
 
+size_t rle_compressed_size(const unsigned char *in_buffer, const size_t in_size) {
+    size_t read_index = 0;
+    size_t bit_count = 0;
+
+    while (read_index < in_size) {
+        const uint8_t match = in_buffer[read_index];
+        size_t j = read_index + 1;
+        while (j < in_size && match == in_buffer[j] && j - read_index <= MAX_RUN) {
+            j++;
+        }
+        bit_count += (j - read_index == 1) ? 9 : 17;
+        read_index = j;
+    }
+
+    return (bit_count + 7) / 8;
+}
+
 unsigned char *rle_compress(const unsigned char *in_buffer, const size_t in_size, size_t *out_size) {
     unsigned char *out_buffer = malloc((in_size * 9 + 7) / 8);
     if (!out_buffer) return NULL;

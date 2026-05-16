@@ -302,6 +302,7 @@ unsigned char *huffman_decompress(const unsigned char *in_buffer, size_t in_size
             out_buffer[write_index++] = entry.symbol;
             uint64_t discard;
             READ_BITS(&bit_buffer, discard, entry.length);
+            (void)discard;
         }
     }
     free_tree(tree);

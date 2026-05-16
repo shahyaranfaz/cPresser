@@ -16,9 +16,17 @@
 #define MIN_MATCH   3
 #define MAX_MATCH   255
 
-static int32_t head[HASH_SIZE];
+#ifndef CPRESS_LZ77_MAX_CHAIN
+#define CPRESS_LZ77_MAX_CHAIN 16
+#endif
 
-#define INIT_HASH() (memset(head, -1, sizeof(head)))
+static int32_t head[HASH_SIZE];
+static int32_t prev[SEARCH_BUFFER];
+
+#define INIT_HASH() do { \
+    memset(head, -1, sizeof(head)); \
+    memset(prev, -1, sizeof(prev)); \
+} while(0)
 
 #define UPDATE_HASH(hash, buffer, pos) do { \
     uint32_t v; \
@@ -29,23 +37,46 @@ static int32_t head[HASH_SIZE];
     hash = v & HASH_MASK; \
 } while(0)
 
-#define INSERT_HASH(hash, pos) (head[hash] = (int32_t)(pos))
+static inline uint32_t load_u32(const unsigned char *buffer) {
+    uint32_t v;
+    memcpy(&v, buffer, sizeof(v));
+    return v;
+}
 
-#define MATCH_HASH(hash, pos, buffer, lookahead, best_len, best_pos) \
-do { \
-    int32_t _match_pos = head[hash]; \
-    *best_len = 0; \
-    if (_match_pos >= 0 && (pos - _match_pos) < SEARCH_BUFFER) { \
-        if (*(uint32_t*)(buffer + _match_pos) == *(uint32_t*)(buffer + pos)) { \
-            int _len = 4; \
-            int _max = (lookahead < MAX_MATCH) ? (int)lookahead : MAX_MATCH; \
-            while (_len < _max && buffer[pos + _len] == buffer[_match_pos + _len]) \
-                _len++; \
-            *best_len = _len; \
-            *best_pos = _match_pos; \
-        } \
-    } \
-} while(0)
+static inline void insert_hash(const int hash, const uint64_t pos) {
+    prev[pos & SEARCH_MASK] = head[hash];
+    head[hash] = (int32_t)pos;
+}
+
+static inline void match_hash(const int hash,
+                              const uint64_t pos,
+                              const unsigned char *buffer,
+                              const uint64_t lookahead,
+                              uint32_t *best_len,
+                              uint32_t *best_pos) {
+    const int max_len = (lookahead < MAX_MATCH) ? (int)lookahead : MAX_MATCH;
+    int32_t match_pos = head[hash];
+    int probes = 0;
+
+    *best_len = 0;
+    while (match_pos >= 0 &&
+           (pos - (uint64_t)match_pos) < SEARCH_BUFFER &&
+           probes++ < CPRESS_LZ77_MAX_CHAIN) {
+        if ((uint32_t)max_len > *best_len &&
+            load_u32(buffer + match_pos) == load_u32(buffer + pos)) {
+            int len = 4;
+            while (len < max_len && buffer[pos + len] == buffer[(uint64_t)match_pos + len]) {
+                len++;
+            }
+            if ((uint32_t)len > *best_len) {
+                *best_len = (uint32_t)len;
+                *best_pos = (uint32_t)match_pos;
+                if (len == max_len) break;
+            }
+        }
+        match_pos = prev[match_pos & SEARCH_MASK];
+    }
+}
 
 unsigned char *lz77_compress(const unsigned char *in_buffer, const uint64_t in_size, uint64_t *out_size) {
     INIT_HASH();
@@ -61,9 +92,9 @@ unsigned char *lz77_compress(const unsigned char *in_buffer, const uint64_t in_s
     int match = 0, hash = 0;
     while (read_index < in_size) {
         uint32_t curr_len = 0, curr_pos = -1;
-        if (read_index + MIN_MATCH <= in_size) {
+        if (read_index + 4 <= in_size) {
             UPDATE_HASH(hash, in_buffer, read_index);
-            MATCH_HASH(hash, read_index, in_buffer, in_size - read_index, &curr_len, &curr_pos);
+            match_hash(hash, read_index, in_buffer, in_size - read_index, &curr_len, &curr_pos);
         }
         if (match) {
             if (curr_len > prev_len) {
@@ -72,7 +103,7 @@ unsigned char *lz77_compress(const unsigned char *in_buffer, const uint64_t in_s
                 prev_len = curr_len;
                 prev_dist = (int32_t)(read_index - curr_pos);
                 if (read_index < in_size)
-                    INSERT_HASH(hash, read_index);
+                    insert_hash(hash, read_index);
                 read_index++;
             } else {
                 WRITE_BITS(&bit_buffer, 1, 1);
@@ -84,7 +115,7 @@ unsigned char *lz77_compress(const unsigned char *in_buffer, const uint64_t in_s
                     if (read_index + 4 <= in_size) {
                         int temp_hash;
                         UPDATE_HASH(temp_hash, in_buffer, read_index);
-                        INSERT_HASH(temp_hash, read_index);
+                        insert_hash(temp_hash, read_index);
                     }
                     read_index++;
                 }
@@ -94,13 +125,13 @@ unsigned char *lz77_compress(const unsigned char *in_buffer, const uint64_t in_s
                 prev_len = curr_len;
                 prev_dist = (int32_t)(read_index - curr_pos);
                 match = 1;
-                INSERT_HASH(hash, read_index);
+                insert_hash(hash, read_index);
                 read_index++;
             } else {
                 WRITE_BITS(&bit_buffer, 0, 1);
                 WRITE_BITS(&bit_buffer, in_buffer[read_index], 8);
                 if (read_index + 4 <= in_size)
-                    INSERT_HASH(hash, read_index);
+                    insert_hash(hash, read_index);
                 read_index++;
             }
         }
@@ -116,6 +147,8 @@ unsigned char *lz77_compress(const unsigned char *in_buffer, const uint64_t in_s
 }
 
 unsigned char *lz77_decompress(const unsigned char *in_buffer, const uint64_t in_size, uint64_t *out_size) {
+    if (in_size < 8) return NULL;
+
     uint64_t original_size;
     memcpy(&original_size, in_buffer, 8);
     unsigned char *out_buffer = malloc(original_size);
