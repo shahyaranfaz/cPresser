@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 project(cPress LANGUAGES C)
 
+include(CTest)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -49,3 +51,11 @@ foreach(target ${CPRESS_TARGETS})
 endforeach()
 
 target_compile_definitions(lz77 PRIVATE CPRESS_LZ77_MAX_CHAIN=${CPRESS_LZ77_MAX_CHAIN})
+
+if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(
+        NAME roundtrip
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_roundtrip.py $<TARGET_FILE:cPress>
+    )
+endif()

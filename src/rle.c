@@ -12,7 +12,7 @@ size_t rle_compressed_size(const unsigned char *in_buffer, const size_t in_size)
     while (read_index < in_size) {
         const uint8_t match = in_buffer[read_index];
         size_t j = read_index + 1;
-        while (j < in_size && match == in_buffer[j] && j - read_index <= MAX_RUN) {
+        while (j < in_size && match == in_buffer[j] && j - read_index < MAX_RUN) {
             j++;
         }
         bit_count += (j - read_index == 1) ? 9 : 17;
@@ -33,7 +33,7 @@ unsigned char *rle_compress(const unsigned char *in_buffer, const size_t in_size
     while (read_index < in_size) {
         const uint8_t match = in_buffer[read_index];
         size_t j = read_index + 1;
-        while (j < in_size && match == in_buffer[j] && j - read_index <= MAX_RUN) {
+        while (j < in_size && match == in_buffer[j] && j - read_index < MAX_RUN) {
             j++;
         }
         if (j-read_index == 1) {

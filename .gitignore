@@ -5,6 +5,7 @@
 # Build folders (CMake)
 cmake-build-*/
 build-*/
+/build/
 CMakeCache.txt
 CMakeFiles/
 Makefile

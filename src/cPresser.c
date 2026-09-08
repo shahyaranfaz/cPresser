@@ -11,8 +11,6 @@
 #include <string.h>
 #include <time.h>
 
-#define MAX_FILE_SIZE 1000000000
-
 typedef struct {
     int delta;
     int rle;
@@ -118,25 +116,17 @@ size_t compress_file(const char* file_name) {
         free(delta_file);
     }
 
-    unsigned char* write_buffer = malloc(best.size + 4);
-    if (!write_buffer) {
-        printf("Error allocating memory for compression\n");
-        free_compression_result(&best);
-        free(original_file);
-        return 0;
-    }
-
-    memcpy(write_buffer + 4, best.data, best.size);
-    write_buffer[0] = best.settings.delta;
-    write_buffer[1] = best.settings.rle;
-    write_buffer[2] = best.settings.huffman;
-    write_buffer[3] = best.settings.lz77;
+    const unsigned char header[4] = {
+        (unsigned char)best.settings.delta,
+        (unsigned char)best.settings.rle,
+        (unsigned char)best.settings.huffman,
+        (unsigned char)best.settings.lz77
+    };
 
     char output_name[512];
     snprintf(output_name, sizeof(output_name), "%s.cPressed", file_name);
-    size_t written = write_file(output_name, write_buffer, best.size + 4);
+    size_t written = write_file_parts(output_name, header, sizeof(header), best.data, best.size);
 
-    free(write_buffer);
     free_compression_result(&best);
     free(original_file);
 
@@ -151,7 +141,7 @@ size_t decompress_file(const char* file_name) {
         return 0;
     }
 
-    if (original_size == 0) {
+    if (original_size < 4) {
         printf("Nothing to decompress!\n");
         free(original_file);
         return 0;
@@ -260,8 +250,9 @@ int main() {
 
         if (output_size == 0) continue;
 
-        printf("Success! Output written to '%s' (%zu bytes, %.3f seconds)\n",
-               output_filename, output_size, (double) (end_time - start_time) / CLOCKS_PER_SEC);
+        printf("Success! Output written to '%s' (%llu bytes, %.3f seconds)\n",
+               output_filename, (unsigned long long)output_size,
+               (double) (end_time - start_time) / CLOCKS_PER_SEC);
     }
     return 0;
 }

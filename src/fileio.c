@@ -58,10 +58,7 @@ unsigned char *read_file(const char *filename, size_t *read_size) {
     return buffer;
 }
 
-size_t write_file(const char *filename, const unsigned char* buffer, const size_t write_size) {
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) return 0;
-
+static size_t write_buffer(FILE *fp, const unsigned char *buffer, const size_t write_size) {
     size_t total_written = 0;
     while (total_written < write_size) {
         size_t to_write = write_size - total_written;
@@ -71,11 +68,34 @@ size_t write_file(const char *filename, const unsigned char* buffer, const size_
         if (bytes == 0) {
             if (ferror(fp))
                 perror("Error writing file");
-            fclose(fp);
             return total_written;
         }
         total_written += bytes;
     }
-    fclose(fp);
     return total_written;
+}
+
+size_t write_file(const char *filename, const unsigned char* buffer, const size_t write_size) {
+    FILE *fp = fopen(filename, "wb");
+    if (!fp) return 0;
+    const size_t written = write_buffer(fp, buffer, write_size);
+    fclose(fp);
+    return written;
+}
+
+size_t write_file_parts(const char *filename,
+                        const unsigned char *prefix,
+                        const size_t prefix_size,
+                        const unsigned char *buffer,
+                        const size_t buffer_size) {
+    FILE *fp = fopen(filename, "wb");
+    if (!fp) return 0;
+
+    const size_t prefix_written = write_buffer(fp, prefix, prefix_size);
+    size_t buffer_written = 0;
+    if (prefix_written == prefix_size)
+        buffer_written = write_buffer(fp, buffer, buffer_size);
+
+    fclose(fp);
+    return prefix_written + buffer_written;
 }

@@ -7,4 +7,10 @@ unsigned char *read_file(const char *filename, size_t *read_size);
 
 size_t write_file(const char *filename, const unsigned char* buffer, size_t write_size);
 
+size_t write_file_parts(const char *filename,
+                        const unsigned char *prefix,
+                        size_t prefix_size,
+                        const unsigned char *buffer,
+                        size_t buffer_size);
+
 #endif
