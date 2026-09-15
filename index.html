@@ -1,29 +1,25 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cPresser | Multi-Algorithm Compression in C</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="cPresser is a lossless file compression tool written in C.">
+    <title>cPresser — lossless compression in C</title>
     <style>
         :root {
             color-scheme: dark;
-            --bg: #07100d;
-            --bg-soft: #0c1713;
-            --panel: #101d18;
-            --panel-strong: #14251f;
-            --text: #effaf4;
-            --muted: #9ab2a6;
-            --line: rgba(188, 255, 213, 0.14);
-            --green: #63f28b;
-            --green-deep: #0d7d49;
-            --green-soft: rgba(99, 242, 139, 0.12);
-            --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+            --background: #0b0d0c;
+            --surface: #121513;
+            --text: #f2f4f2;
+            --muted: #9ba39d;
+            --line: #292e2a;
+            --accent: #78ec9b;
+            font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+            line-height: 1.6;
         }
 
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
         }
 
         html {
@@ -31,573 +27,305 @@
         }
 
         body {
-            min-height: 100vh;
-            background:
-                linear-gradient(150deg, rgba(99, 242, 139, 0.08), transparent 34%),
-                radial-gradient(circle at 82% 12%, rgba(13, 125, 73, 0.32), transparent 32%),
-                var(--bg);
-            color: var(--text);
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            line-height: 1.6;
-        }
-
-        a {
-            color: inherit;
-            text-decoration: none;
-        }
-
-        .shell {
-            width: min(1120px, calc(100% - 40px));
+            max-width: 64rem;
             margin: 0 auto;
+            padding: 0 2rem;
+            background: var(--background);
+            color: var(--text);
         }
 
-        .topbar {
+        header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 24px;
-            padding: 28px 0;
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--line);
         }
 
-        .brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .mark {
-            display: grid;
-            width: 34px;
-            height: 34px;
-            place-items: center;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            background: linear-gradient(145deg, var(--green-soft), rgba(255, 255, 255, 0.03));
-            color: var(--green);
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        .logo {
+            color: var(--text);
+            font-weight: 750;
+            letter-spacing: -0.04em;
+            text-decoration: none;
         }
 
         nav {
             display: flex;
-            align-items: center;
-            gap: 18px;
+            gap: 1.5rem;
+            font-size: 0.875rem;
+        }
+
+        a {
             color: var(--muted);
-            font-size: 0.92rem;
+            text-underline-offset: 0.2em;
         }
 
-        nav a:hover {
-            color: var(--green);
+        a:hover {
+            color: var(--accent);
         }
 
-        .hero {
-            display: grid;
-            grid-template-columns: minmax(0, 1.04fr) minmax(320px, 0.72fr);
-            gap: 48px;
-            align-items: center;
-            min-height: calc(100vh - 98px);
-            padding: 52px 0 84px;
+        .intro {
+            padding: 7rem 0 6rem;
         }
 
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 22px;
-            color: var(--green);
-            font-size: 0.82rem;
-            font-weight: 700;
+        .label {
+            margin: 0 0 1rem;
+            color: var(--accent);
+            font: 0.75rem ui-monospace, SFMono-Regular, Consolas, monospace;
             letter-spacing: 0.12em;
             text-transform: uppercase;
         }
 
-        .eyebrow::before {
-            content: "";
-            width: 38px;
-            height: 1px;
-            background: var(--green);
-        }
-
         h1 {
-            max-width: 740px;
-            font-size: clamp(3.4rem, 8vw, 6.9rem);
-            line-height: 0.9;
-            letter-spacing: 0;
+            max-width: 50rem;
+            margin: 0;
+            font-size: clamp(3.5rem, 9vw, 7rem);
+            line-height: 0.95;
+            letter-spacing: -0.07em;
         }
 
-        .hero-copy {
-            max-width: 650px;
-            margin-top: 26px;
+        .lede {
+            max-width: 38rem;
+            margin: 2rem 0 0;
             color: var(--muted);
-            font-size: clamp(1.02rem, 2vw, 1.22rem);
+            font-size: clamp(1.05rem, 2vw, 1.25rem);
         }
 
-        .actions {
+        .links {
             display: flex;
-            flex-wrap: wrap;
-            gap: 14px;
-            margin-top: 34px;
+            gap: 1.5rem;
+            margin-top: 2rem;
         }
 
-        .button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 48px;
-            padding: 0 20px;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            color: var(--text);
-            font-weight: 700;
-            transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+        .links a:first-child {
+            color: var(--accent);
         }
 
-        .button:hover {
-            transform: translateY(-1px);
-            border-color: rgba(99, 242, 139, 0.55);
-        }
-
-        .button.primary {
-            border-color: transparent;
-            background: var(--green);
-            color: #03120b;
-        }
-
-        .button.secondary {
-            background: rgba(255, 255, 255, 0.03);
-        }
-
-        .stats {
+        section:not(.intro) {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-top: 46px;
-            max-width: 640px;
-        }
-
-        .stat {
+            grid-template-columns: minmax(10rem, 0.35fr) minmax(0, 0.65fr);
+            gap: 3rem;
+            padding: 4.5rem 0;
             border-top: 1px solid var(--line);
-            padding-top: 16px;
         }
 
-        .stat strong {
-            display: block;
-            color: var(--green);
-            font-size: 1.55rem;
+        h2 {
+            margin: 0;
+            font-size: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        h3 {
+            margin: 2.5rem 0 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        h3:first-child {
+            margin-top: 0;
+        }
+
+        p {
+            margin-top: 0;
+        }
+
+        .copy {
+            color: var(--muted);
+        }
+
+        .copy strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        ol {
+            margin: 1.75rem 0 0;
+            padding: 0;
+            list-style: none;
+            counter-reset: stages;
+        }
+
+        li {
+            display: flex;
+            gap: 1rem;
+            padding: 0.65rem 0;
+            border-bottom: 1px solid var(--line);
+            counter-increment: stages;
+        }
+
+        li::before {
+            content: "0" counter(stages);
+            color: var(--accent);
+            font: 0.75rem ui-monospace, SFMono-Regular, Consolas, monospace;
+        }
+
+        pre {
+            margin: 0;
+            overflow-x: auto;
+            padding: 1.25rem 1.5rem;
+            border-left: 2px solid var(--accent);
+            background: var(--surface);
+            color: #d7dcd8;
+            font: 0.85rem/1.75 ui-monospace, SFMono-Regular, Consolas, monospace;
+        }
+
+        .result {
+            margin: 0 0 1rem;
+            color: var(--accent);
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 750;
             line-height: 1;
+            letter-spacing: -0.06em;
         }
 
-        .stat span {
-            display: block;
-            margin-top: 7px;
+        .facts {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .facts p {
+            margin: 0;
             color: var(--muted);
             font-size: 0.9rem;
         }
 
-        .terminal {
-            overflow: hidden;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            background: rgba(6, 13, 10, 0.82);
-            box-shadow: var(--shadow);
-        }
-
-        .terminal-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid var(--line);
-            padding: 13px 16px;
-            color: var(--muted);
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-            font-size: 0.82rem;
-        }
-
-        .dots {
-            display: flex;
-            gap: 7px;
-        }
-
-        .dots span {
-            width: 9px;
-            height: 9px;
-            border-radius: 999px;
-            background: var(--green-deep);
-        }
-
-        pre {
-            overflow-x: auto;
-            padding: 24px;
-            color: #d8fbe3;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-            font-size: 0.92rem;
-            line-height: 1.72;
-            white-space: pre;
-        }
-
-        code {
-            color: var(--green);
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        }
-
-        main {
-            padding-bottom: 72px;
-        }
-
-        .section {
-            padding: 72px 0;
-            border-top: 1px solid var(--line);
-        }
-
-        .section-title {
-            display: grid;
-            grid-template-columns: minmax(0, 0.62fr) minmax(280px, 0.38fr);
-            gap: 34px;
-            align-items: end;
-            margin-bottom: 30px;
-        }
-
-        h2 {
-            font-size: clamp(2rem, 4vw, 3.4rem);
-            line-height: 1;
-            letter-spacing: 0;
-        }
-
-        .section-title p {
-            color: var(--muted);
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
-        }
-
-        .card {
-            min-height: 186px;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
-            padding: 22px;
-        }
-
-        .card b {
+        .facts strong {
             display: block;
-            margin-bottom: 12px;
-            color: var(--green);
-            font-size: 0.82rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
+            color: var(--text);
+            font-size: 1.1rem;
         }
 
-        .card h3 {
-            margin-bottom: 10px;
-            font-size: 1.16rem;
-            line-height: 1.25;
-        }
-
-        .card p {
-            color: var(--muted);
-            font-size: 0.96rem;
-        }
-
-        .pipeline {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1px;
-            overflow: hidden;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            background: var(--line);
-        }
-
-        .step {
-            min-height: 192px;
-            background: var(--panel);
-            padding: 22px;
-        }
-
-        .step span {
-            display: inline-grid;
-            width: 34px;
-            height: 34px;
-            place-items: center;
-            margin-bottom: 28px;
-            border-radius: 8px;
-            background: var(--green-soft);
-            color: var(--green);
-            font-weight: 800;
-        }
-
-        .step h3 {
-            margin-bottom: 9px;
-        }
-
-        .step p {
-            color: var(--muted);
-            font-size: 0.94rem;
-        }
-
-        .usage {
-            display: grid;
-            grid-template-columns: minmax(0, 0.92fr) minmax(280px, 0.56fr);
-            gap: 18px;
-            align-items: stretch;
-        }
-
-        .mini-panel {
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            background: var(--panel-strong);
-            padding: 26px;
-        }
-
-        .mini-panel h3 {
-            margin-bottom: 14px;
-        }
-
-        .mini-panel ul {
-            display: grid;
-            gap: 12px;
-            list-style: none;
-            color: var(--muted);
-        }
-
-        .mini-panel li {
-            display: flex;
-            gap: 10px;
-            align-items: flex-start;
-        }
-
-        .mini-panel li::before {
-            content: "";
-            flex: 0 0 auto;
-            width: 8px;
-            height: 8px;
-            margin-top: 9px;
-            border-radius: 999px;
-            background: var(--green);
+        .note {
+            margin-top: 2rem;
+            font-size: 0.9rem;
         }
 
         footer {
-            border-top: 1px solid var(--line);
-            padding: 26px 0 38px;
-            color: var(--muted);
-            font-size: 0.94rem;
-        }
-
-        .footer-row {
             display: flex;
             justify-content: space-between;
-            gap: 18px;
+            gap: 1rem;
+            padding: 2rem 0 3rem;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 0.8rem;
         }
 
-        footer a {
-            color: var(--green);
+        footer p {
+            margin: 0;
         }
 
-        @media (max-width: 860px) {
-            .topbar,
-            .footer-row {
-                align-items: flex-start;
+        @media (max-width: 640px) {
+            body {
+                padding: 0 1.25rem;
+            }
+
+            nav a:not(:last-child) {
+                display: none;
+            }
+
+            .intro {
+                padding: 5rem 0 4rem;
+            }
+
+            section:not(.intro) {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+                padding: 3.5rem 0;
+            }
+
+            .facts {
+                grid-template-columns: 1fr;
+            }
+
+            footer {
                 flex-direction: column;
-            }
-
-            nav {
-                flex-wrap: wrap;
-            }
-
-            .hero,
-            .section-title,
-            .usage {
-                grid-template-columns: 1fr;
-            }
-
-            .hero {
-                min-height: auto;
-                padding-top: 34px;
-            }
-
-            .grid,
-            .pipeline,
-            .stats {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 520px) {
-            .shell {
-                width: min(100% - 28px, 1120px);
-            }
-
-            .actions {
-                display: grid;
-            }
-
-            .button {
-                width: 100%;
-            }
-
-            pre {
-                padding: 18px;
-                font-size: 0.82rem;
             }
         }
     </style>
 </head>
 <body>
-    <header class="shell topbar">
-        <a class="brand" href="#" aria-label="cPresser home">
-            <span class="mark">cP</span>
-            <span>cPresser</span>
-        </a>
-        <nav aria-label="Primary navigation">
-            <a href="#features">Features</a>
-            <a href="#pipeline">Pipeline</a>
-            <a href="#usage">Usage</a>
+    <header>
+        <a class="logo" href="#">cPresser</a>
+        <nav aria-label="Page navigation">
+            <a href="#build">Build</a>
+            <a href="#use">Use</a>
+            <a href="#results">Results</a>
             <a href="https://github.com/shahyaranfaz/cPresser">GitHub</a>
         </nav>
     </header>
 
     <main>
-        <section class="shell hero">
-            <div>
-                <p class="eyebrow">Lossless compression toolkit</p>
-                <h1>Compression with a C edge.</h1>
-                <p class="hero-copy">
-                    cPresser combines Delta XOR, RLE, Huffman, and LZ77 into a compact command-line tool that tests each stage and keeps only the transformations that make the file smaller.
-                </p>
-                <div class="actions">
-                    <a class="button primary" href="https://github.com/shahyaranfaz/cPresser">View Source</a>
-                    <a class="button secondary" href="https://github.com/shahyaranfaz/cPresser/archive/refs/heads/main.zip">Download ZIP</a>
-                </div>
-                <div class="stats" aria-label="Project highlights">
-                    <div class="stat">
-                        <strong>4</strong>
-                        <span>Compression stages</span>
-                    </div>
-                    <div class="stat">
-                        <strong>46.97%</strong>
-                        <span>Silesia size reduction</span>
-                    </div>
-                    <div class="stat">
-                        <strong>0%</strong>
-                        <span>Lossy shortcuts</span>
-                    </div>
-                </div>
+        <section class="intro">
+            <p class="label">Lossless compression in C</p>
+            <h1>cPresser</h1>
+            <p class="lede">cPresser tries Delta XOR, run-length encoding, Huffman coding, and LZ77. A stage is kept only when it reduces the file size.</p>
+            <div class="links">
+                <a href="https://github.com/shahyaranfaz/cPresser">View source →</a>
+                <a href="https://github.com/shahyaranfaz/cPresser/archive/refs/heads/main.zip">Download ZIP</a>
             </div>
+        </section>
 
-            <aside class="terminal" aria-label="Build commands">
-                <div class="terminal-head">
-                    <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
-                    <span>build.sh</span>
-                </div>
+        <section id="build">
+            <h2>Build</h2>
+            <div class="copy">
+                <p>Requires a C compiler and CMake 3.16 or newer.</p>
                 <pre><code>git clone https://github.com/shahyaranfaz/cPresser.git
 cd cPresser
-
-mkdir build
-cd build
-cmake ..
-make
-
-./cPress</code></pre>
-            </aside>
-        </section>
-
-        <section class="shell section" id="features">
-            <div class="section-title">
-                <h2>Lean where it counts.</h2>
-                <p>Built for a simple job: compress files, preserve every byte, and avoid wasting space on stages that do not improve the output.</p>
-            </div>
-            <div class="grid">
-                <article class="card">
-                    <b>Selective</b>
-                    <h3>Applies only useful algorithms</h3>
-                    <p>Each compression step is measured before it becomes part of the final output.</p>
-                </article>
-                <article class="card">
-                    <b>Portable</b>
-                    <h3>CMake-backed C project</h3>
-                    <p>A small native codebase with straightforward build requirements: GCC or Clang and CMake.</p>
-                </article>
-                <article class="card">
-                    <b>Recoverable</b>
-                    <h3>Headers store the recipe</h3>
-                    <p>The compressed file records which stages ran, so decompression can reverse the pipeline automatically.</p>
-                </article>
+cmake -S . -B build
+cmake --build build</code></pre>
             </div>
         </section>
 
-        <section class="shell section" id="pipeline">
-            <div class="section-title">
-                <h2>The pipeline.</h2>
-                <p>Four classic algorithms work together, each targeting a different pattern in the input data.</p>
-            </div>
-            <div class="pipeline">
-                <article class="step">
-                    <span>1</span>
-                    <h3>Delta XOR</h3>
-                    <p>Stores byte-to-byte changes to reduce repeated structure in gradual data.</p>
-                </article>
-                <article class="step">
-                    <span>2</span>
-                    <h3>RLE</h3>
-                    <p>Collapses repeated runs into compact count/value pairs.</p>
-                </article>
-                <article class="step">
-                    <span>3</span>
-                    <h3>Huffman</h3>
-                    <p>Uses shorter codes for frequent symbols and longer codes for rare ones.</p>
-                </article>
-                <article class="step">
-                    <span>4</span>
-                    <h3>LZ77</h3>
-                    <p>Replaces repeated patterns with references to earlier data windows.</p>
-                </article>
-            </div>
-        </section>
+        <section id="use">
+            <h2>Compress and decompress</h2>
+            <div class="copy">
+                <p>Start <code>cPress</code> and choose an action from the prompt. Compressed files receive the <code>.cPressed</code> suffix; restored files receive <code>.original</code>.</p>
 
-        <section class="shell section" id="usage">
-            <div class="section-title">
-                <h2>Run it from the terminal.</h2>
-                <p>The interactive CLI keeps the surface area small: choose an action, enter a filename, and let cPresser write the result.</p>
-            </div>
-            <div class="usage">
-                <div class="terminal" aria-label="Usage example">
-                    <div class="terminal-head">
-                        <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
-                        <span>session</span>
-                    </div>
-                    <pre><code>Welcome to cPresser!
+                <h3>Compress</h3>
+                <pre><code>./build/cPress
 
 Compress (c), Decompress (d), or Exit (x): c
 Enter filename: myfile.txt
-Success! Output written to 'myfile.txt.cPressed'
+Success! Output written to 'myfile.txt.cPressed'</code></pre>
 
-Compress (c), Decompress (d), or Exit (x): d
+                <h3>Decompress</h3>
+                <pre><code>Compress (c), Decompress (d), or Exit (x): d
 Enter filename: myfile.txt.cPressed
 Success! Output written to 'myfile.txt.cPressed.original'</code></pre>
+            </div>
+        </section>
+
+        <section id="results">
+            <h2>Silesia benchmark</h2>
+            <div class="copy">
+                <p class="result">46.97%</p>
+                <p><strong>smaller across the complete 12-file Silesia corpus.</strong> cPresser reduced 211,938,580 bytes to 112,385,535 bytes. Every compressed file was decompressed and matched to its source with SHA-256 before its result was accepted.</p>
+                <div class="facts">
+                    <p><strong>53.03%</strong>of the original size</p>
+                    <p><strong>Byte-for-byte</strong>round-trip verification</p>
                 </div>
-                <aside class="mini-panel">
-                    <h3>What you need</h3>
-                    <ul>
-                        <li>C compiler such as GCC or Clang</li>
-                        <li>CMake 3.16 or newer</li>
-                        <li>A file you want compressed losslessly</li>
-                    </ul>
-                </aside>
+            </div>
+        </section>
+
+        <section id="details">
+            <h2>How it works</h2>
+            <div class="copy">
+                <p>The output header records which stages were used, so decompression can reverse them automatically.</p>
+                <ol>
+                    <li>Delta XOR</li>
+                    <li>Run-length encoding</li>
+                    <li>Huffman coding</li>
+                    <li>LZ77</li>
+                </ol>
+                <p class="note">cPresser processes complete files in memory. The practical file-size limit depends on available memory.</p>
             </div>
         </section>
     </main>
 
     <footer>
-        <div class="shell footer-row">
-            <p>Created by <a href="https://github.com/shahyaranfaz">Shahyar Anfaz</a>.</p>
-            <p>MIT licensed · 2026</p>
-        </div>
+        <p>Created by <a href="https://github.com/shahyaranfaz">Shahyar Anfaz</a>.</p>
+        <p>MIT licensed</p>
     </footer>
 </body>
 </html>
