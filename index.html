@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="cPresser is a lossless file compression tool written in C.">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <title>cPresser — lossless compression in C</title>
     <style>
         :root {
@@ -24,10 +25,12 @@
 
         html {
             scroll-behavior: smooth;
+            overflow-x: hidden;
         }
 
         body {
             max-width: 64rem;
+            min-width: 0;
             margin: 0 auto;
             padding: 0 2rem;
             background: var(--background);
@@ -129,7 +132,12 @@
         }
 
         .copy {
+            min-width: 0;
             color: var(--muted);
+        }
+
+        code {
+            overflow-wrap: anywhere;
         }
 
         .copy strong {
@@ -159,8 +167,11 @@
         }
 
         pre {
+            max-width: 100%;
             margin: 0;
             overflow-x: auto;
+            overscroll-behavior-inline: contain;
+            -webkit-overflow-scrolling: touch;
             padding: 1.25rem 1.5rem;
             border-left: 2px solid var(--accent);
             background: var(--surface);
@@ -220,26 +231,83 @@
                 padding: 0 1.25rem;
             }
 
-            nav a:not(:last-child) {
-                display: none;
+            header {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1.25rem 0;
+            }
+
+            nav {
+                width: 100%;
+                gap: 0.75rem 1.25rem;
+            }
+
+            nav a {
+                min-height: 2rem;
             }
 
             .intro {
-                padding: 5rem 0 4rem;
+                padding: 4.5rem 0 4rem;
+            }
+
+            h1 {
+                font-size: clamp(3rem, 18vw, 4.5rem);
+            }
+
+            .lede {
+                margin-top: 1.5rem;
+            }
+
+            .links {
+                flex-wrap: wrap;
+                gap: 0.75rem 1.5rem;
             }
 
             section:not(.intro) {
                 grid-template-columns: 1fr;
                 gap: 1.5rem;
-                padding: 3.5rem 0;
+                padding: 3rem 0;
+                scroll-margin-top: 1rem;
+            }
+
+            pre {
+                margin-inline: -1.25rem;
+                max-width: calc(100% + 2.5rem);
+                padding: 1rem 1.25rem;
+                border-left-width: 0;
+                font-size: 0.78rem;
             }
 
             .facts {
                 grid-template-columns: 1fr;
+                gap: 1rem;
             }
 
             footer {
                 flex-direction: column;
+            }
+        }
+
+        @media (max-width: 360px) {
+            body {
+                padding: 0 1rem;
+            }
+
+            nav {
+                justify-content: space-between;
+                gap: 0.5rem;
+                font-size: 0.8rem;
+            }
+
+            .intro {
+                padding-top: 3.5rem;
+            }
+
+            pre {
+                margin-inline: -1rem;
+                max-width: calc(100% + 2rem);
+                padding-inline: 1rem;
             }
         }
     </style>

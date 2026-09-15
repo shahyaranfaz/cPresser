@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <style>
+        text {
+            fill: #f2f4f2;
+            stroke: #000;
+            stroke-width: 1.5px;
+            paint-order: stroke fill;
+            font: 750 46px Inter, ui-sans-serif, system-ui, sans-serif;
+            letter-spacing: -2px;
+        }
+    </style>
+    <text x="5" y="49">cP</text>
+</svg>
